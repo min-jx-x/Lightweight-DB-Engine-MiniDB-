@@ -1,3 +1,4 @@
+#pragma once
 #include "B-PlusTree.h"
 #include <iostream>
 
@@ -38,4 +39,74 @@ void BPlusTree::Insert(int key, string value) {
 	leaf->keyCount++;
 
 	cout << "Inserted:" << key << endl;
+}
+
+/*
+* @brief B+ Tree에서 특정 Key에 해당하는 value 검색
+*/
+string BPlusTree::Search(int key) {							  ///< Key로 Value 검색 (없으면 빈 문자열)
+	if (root == nullptr) return "";							  ///< 예외처리
+	Node* cursor = root;
+
+	///< [Index Layer 탐색] 리프노드에 도달할 때까지 내려감
+	while (!cursor->isLeaf) {
+		int i = 0;
+		while (i < cursor->keyCount && key >= cursor->keys[i]) {  ///< 어느 자식으로 내려갈지 결정
+			i++;
+		}
+		cursor = cursor->children[i];							  ///< 결정된 자식 노드로 포인터 이동
+	}
+	///< [Data Layer 탐색] 실제 데이터가 있는 리프 노드 도착
+	for (int i = 0; i < cursor->keyCount; i++) {				  ///< 노드 내의 키들을  순회하며 일치하는 값이 있는지 확인.
+		if (cursor->keys[i] == key)
+			return cursor->values[i];
+	}
+	return "";
+}
+/*
+* @brief B+ Tree에서 트리의 루트가 분할(Split)되어 새로운 루트를 생성하는 로직
+*/
+void BPlusTree::insertIntoParent(Node* left, int key, Node* right) {
+	// 1. [Root Split] 부모가 없는 경우 (Left가 곧 Root인 경우)
+   // 트리의 높이(Height)가 1 증가하며 새로운 루트가 생성됨
+	if (root == left) {
+		Node* newRoot = new Node(false);
+		newRoot->keys[0] = key;             ///< 새 루트의 첫 번째 키 설정
+		newRoot->children[0] = left;        ///< 왼쪽 자식 연결
+		newRoot->children[1] = right;       ///< 오른쪽 자식 연결
+		newRoot->keyCount = 1;
+
+		left->parent = newRoot;             ///< 자식들의 부모 포인터 갱신
+		right->parent = newRoot;
+		root = newRoot;                     ///< 전역 루트 포인터 갱신
+		return;
+	}
+
+	// 2. [General Insert] 이미 부모가 존재하는 경우
+	// 부모 노드에 자리가 있는지 확인하고 정렬하여 삽입
+	else {
+		Node* parent = left->parent;
+
+		// 들어갈 위치 찾기 및 자리 만들기 (Shift Right)
+		// 키와 자식 포인터를 한 칸씩 뒤로 밀어 공간 확보
+		int i = parent->keyCount - 1;
+		while (i >= 0 && parent->keys[i] > key) {
+			parent->keys[i + 1] = parent->keys[i];
+			parent->children[i + 2] = parent->children[i + 1]; // 포인터도 같이 이동
+			i--;
+		}
+
+		// 빈 자리에 키와 포인터 삽입
+		parent->keys[i + 1] = key;
+		parent->children[i + 2] = right;
+		parent->keyCount++;
+
+		right->parent = parent; // 새 자식의 부모 연결
+
+		// 3. [Overflow Handling] 부모 노드도 꽉 찼을 경우
+		// 내부 노드 분할(Split Internal)을 재귀적으로 호출
+		if (parent->keyCount == ORDER) {
+			splitInternal(parent);
+		}
+	}
 }
