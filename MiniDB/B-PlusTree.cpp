@@ -1,3 +1,4 @@
+#pragma once
 #include "B-PlusTree.h"
 #include <iostream>
 
@@ -38,4 +39,27 @@ void BPlusTree::Insert(int key, string value) {
 	leaf->keyCount++;
 
 	cout << "Inserted:" << key << endl;
+}
+
+/*
+* @brief B+ Tree에서 특정 Key에 해당하는 value 검색
+*/
+string BPlusTree::Search(int key) {							  ///< Key로 Value 검색 (없으면 빈 문자열)
+	if (root == nullptr) return "";							  ///< 예외처리
+	Node* cursor = root;
+
+	///< [Index Layer 탐색] 리프노드에 도달할 때까지 내려감
+	while (!cursor->isLeaf) {
+		int i = 0;
+		while (i < cursor->keyCount && key >= cursor->keys[i]) {  ///< 어느 자식으로 내려갈지 결정
+			i++;
+		}
+		cursor = cursor->children[i];							  ///< 결정된 자식 노드로 포인터 이동
+	}
+	///< [Data Layer 탐색] 실제 데이터가 있는 리프 노드 도착
+	for (int i = 0; i < cursor->keyCount; i++) {				  ///< 노드 내의 키들을  순회하며 일치하는 값이 있는지 확인.
+		if (cursor->keys[i] == key)
+			return cursor->values[i];
+	}
+	return "";
 }
