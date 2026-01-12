@@ -23,6 +23,7 @@ void BPlusTree::Insert(int key, string value) {
 	// 예외 처리: 노드가 가득 찼을 때
 	if (leaf->keyCount == ORDER) {
 		splitLeaf(leaf);
+
 		// 쪼개진 후에는 새로운 루트에서 다시 자리를 찾기
 		// 일단 지금은 단순하게 쪼개는 것까지만 테스트
 		Insert(key, value);
@@ -96,7 +97,6 @@ void BPlusTree::splitLeaf(Node* leaf) {
 	// 6. 부모 노드에 새 키 등록 (승진)
 	insertIntoParent(leaf, newLeaf->keys[0], newLeaf);
 }
-
 /*
 * @brief B+ Tree에서 트리의 루트가 분할(Split)되어 새로운 루트를 생성하는 로직
 */
