@@ -23,7 +23,6 @@ void BPlusTree::Insert(int key, string value) {
 	// 예외 처리: 노드가 가득 찼을 때
 	if (leaf->keyCount == ORDER) {
 		splitLeaf(leaf);
-
 		// 쪼개진 후에는 새로운 루트에서 다시 자리를 찾기
 		// 일단 지금은 단순하게 쪼개는 것까지만 테스트
 		Insert(key, value);
