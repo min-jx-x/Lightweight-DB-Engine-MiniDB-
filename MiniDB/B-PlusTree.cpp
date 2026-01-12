@@ -63,3 +63,15 @@ string BPlusTree::Search(int key) {							  ///< Key로 Value 검색 (없으면 빈 문�
 	}
 	return "";
 }
+/*
+* @brief B+ Tree에서 트리의 루트가 분할(Split)되어 새로운 루트를 생성하는 로직
+*/
+void BPlusTree::insert_into_new_root(Node* left, int key, Node* right) {
+	Node* newRoot = new Node(false);
+	newRoot->keys[0] = key;										///< newRoot의 첫 번째 키(keys[0])에 key 저장
+	newRoot->children[0] = left;								///< newRoot의 첫 번째 자식(children[0])은 left
+	newRoot->children[1] = right;								///< 두 번째 자식(children[1])은 right로 연결
+	left->parent = newRoot;										///< left와 right의 부모로 newRoot를 가리키게 변경
+	right->parent = newRoot;
+	root = newRoot;												///< 트리의 root를 newRoot로 변경
+}
