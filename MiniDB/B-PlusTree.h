@@ -49,6 +49,5 @@ public:
 
     string Search(int key);             ///< Key로 Value 검색 (없으면 빈 문자열)
     void Insert(int key, string value); ///< 새로운 Key-Value 쌍 삽입
-    void insert_into_new_root(Node* left, int key, Node* right);
     void PrintTree();                   ///< 트리 구조 전체 출력 (디버깅)
 };
