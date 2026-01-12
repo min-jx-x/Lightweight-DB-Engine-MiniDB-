@@ -20,9 +20,13 @@ void BPlusTree::Insert(int key, string value) {
 	// TODO: 루트가 리프가 아닐 경우 탐색 로직 추가 필요
 	Node* leaf = root;
 
-	// 예외 처리: 노드가 가득 찼을 때(Split 로직 추가 예정)
+	// 예외 처리: 노드가 가득 찼을 때
 	if (leaf->keyCount == ORDER) {
-		cout << "Node is full" << endl;
+		splitLeaf(leaf);
+		
+		// 쪼개진 후에는 새로운 루트에서 다시 자리를 찾기
+		// 일단 지금은 단순하게 쪼개는 것까지만 테스트
+		Insert(key, value);
 		return;
 	}
 
@@ -62,6 +66,37 @@ string BPlusTree::Search(int key) {							  ///< Key로 Value 검색 (없으면 빈 문�
 			return cursor->values[i];
 	}
 	return "";
+}
+
+/*
+* @brief 리프 노드가 꽉 찼을 때 반으로 분할하고 부모에게 승격(Promote) 요청
+*/
+void BPlusTree::splitLeaf(Node* leaf) {
+	// 1. 새로운 형제 노드 생성
+	Node* newLeaf = new Node(true);
+
+	// 2. 분할 기준점 설정 (중간 지점)
+	int splitIndex = (ORDER + 1) / 2;
+
+	// 3. 기존 노드의 오른쪽 절반을 새 노드로 복사
+	int j = 0;
+	for (int i = splitIndex; i < ORDER; i++) {
+		newLeaf->keys[j] = leaf->keys[i];
+		newLeaf->values[j] = leaf->values[i];
+		j++;
+	}
+
+	// 4. 각 노드의 키 개수(KeyCount) 갱신
+	leaf->keyCount = splitIndex;            // 기존 노드는 절반으로 줄어듦
+	newLeaf->keyCount = ORDER - splitIndex; // 나머지는 새 노드가 가짐
+
+	// 5. 리프 노드 연결 리스트 구조 유지
+	newLeaf->nextLeaf = leaf->nextLeaf;     // 새 노드가 기존 노드의 뒷부분을 가리킴
+	leaf->nextLeaf = newLeaf;               // 기존 노드가 새 노드를 가리킴
+
+	// 6. 부모 노드에 새 키 등록 (승진)
+	insertIntoParent(leaf, newLeaf->keys[0], newLeaf);
+}
 }
 /*
 * @brief B+ Tree에서 트리의 루트가 분할(Split)되어 새로운 루트를 생성하는 로직
