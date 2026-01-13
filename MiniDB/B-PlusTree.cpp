@@ -1,6 +1,8 @@
 #pragma once
 #include "B-PlusTree.h"
 #include <iostream>
+#include <queue>
+#include <string>
 
 /**
  * @brief B+ 트리에 키-값 쌍을 삽입합니다.
@@ -33,7 +35,7 @@ void BPlusTree::Insert(int key, string value) {
 	// 3. 예외 처리: 노드가 가득 찼을 때
 	if (leaf->keyCount == ORDER) {
 		splitLeaf(leaf);
-    
+
 		// 쪼개진 후에는 새로운 루트에서 다시 자리를 찾기
 		// 일단 지금은 단순하게 쪼개는 것까지만 테스트
 		Insert(key, value);
@@ -108,7 +110,7 @@ void BPlusTree::splitLeaf(Node* leaf) {
 	// 6. 부모 노드에 새 키 등록 (승진)
 	insertIntoParent(leaf, newLeaf->keys[0], newLeaf);
 }
-}
+
 /*
 * @brief B+ Tree에서 트리의 루트가 분할(Split)되어 새로운 루트를 생성하는 로직
 */
@@ -192,4 +194,62 @@ void BPlusTree::splitInternal(Node* parent) {
 
 	// 7. 부모 노드에 중간 키 등록 (재귀 호출)
 	insertIntoParent(parent, backupkey, newInternal);
+}
+
+void BPlusTree::PrintTree() {
+	// 트리가 비어있는지 확인
+	if (root == nullptr) {
+		std::cout << "Tree is empty." << std::endl;
+		return;
+	}
+
+	// BFS를 위한 큐 선언 (std::queue 사용)
+	std::queue<Node*> q;
+	q.push(root);
+
+	int level = 0;
+	std::cout << "=== B+ Tree Structure (BFS) ===" << std::endl;
+
+	while (!q.empty()) {
+		int levelSize = q.size(); // 현재 레벨에 있는 노드의 개수
+
+		std::cout << "Level " << level << ": ";
+
+		// 현재 레벨의 모든 노드를 순회
+		for (int i = 0; i < levelSize; i++) {
+			Node* curr = q.front();
+			q.pop();
+
+			std::cout << "[ ";
+			for (int j = 0; j < curr->keyCount; j++) {
+				// 1. 키(Key) 출력
+				std::cout << curr->keys[j];
+
+				// 2. 리프 노드라면 데이터(Value)도 함께 출력
+				if (curr->isLeaf) {
+					std::cout << "(" << curr->values[j] << ")";
+				}
+
+				// 마지막 키가 아니라면 공백 추가
+				if (j < curr->keyCount - 1) {
+					std::cout << " ";
+				}
+			}
+			std::cout << " ] ";
+
+			// 내부 노드라면 자식들을 큐에 추가
+			if (!curr->isLeaf) {
+				// 자식 포인터 개수는 키 개수 + 1
+				for (int j = 0; j <= curr->keyCount; j++) {
+					if (curr->children[j] != nullptr) {
+						q.push(curr->children[j]);
+					}
+				}
+			}
+		}
+		// 레벨 변경 시 줄바꿈
+		std::cout << std::endl;
+		level++;
+	}
+	std::cout << "===============================" << std::endl;
 }
