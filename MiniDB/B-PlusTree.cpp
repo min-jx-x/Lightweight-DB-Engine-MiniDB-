@@ -5,323 +5,324 @@
 #include <string>
 
 /**
- * @brief B+ Æ®¸®¿¡ Å°-°ª ½ÖÀ» »ğÀÔÇÕ´Ï´Ù.
- * @details ·çÆ®ºÎÅÍ Å½»öÇÏ¿© ÀûÀıÇÑ ¸®ÇÁ ³ëµå¸¦ Ã£°í, µ¥ÀÌÅÍ¸¦ »ğÀÔÇÕ´Ï´Ù.
- * ³ëµå°¡ °¡µæ Âù °æ¿ì ºĞÇÒ(Split)À» ¼öÇàÇÕ´Ï´Ù.
- * @param key »ğÀÔÇÒ Å°
- * @param value Å°¿¡ ´ëÀÀÇÏ´Â °ª
+ * @brief B+ íŠ¸ë¦¬ì— í‚¤-ê°’ ìŒì„ ì‚½ì…í•©ë‹ˆë‹¤.
+ * @details ë£¨íŠ¸ë¶€í„° íƒìƒ‰í•˜ì—¬ ì ì ˆí•œ ë¦¬í”„ ë…¸ë“œë¥¼ ì°¾ê³ , ë°ì´í„°ë¥¼ ì‚½ì…í•©ë‹ˆë‹¤.
+ * ë…¸ë“œê°€ ê°€ë“ ì°¬ ê²½ìš° ë¶„í• (Split)ì„ ìˆ˜í–‰í•©ë‹ˆë‹¤.
+ * @param key ì‚½ì…í•  í‚¤
+ * @param value í‚¤ì— ëŒ€ì‘í•˜ëŠ” ê°’
  */
 void BPlusTree::Insert(int key, string value) {
-	// 1. Æ®¸®°¡ ºñ¾îÀÖ´Ù¸é ·çÆ® ³ëµå »ı¼º
-	if (root == nullptr) {
-		root = new Node(true);
-		root->keys[0] = key;
-		root->values[0] = value;
-		root->keyCount = 1;
-		return;
-	}
+   // 1. íŠ¸ë¦¬ê°€ ë¹„ì–´ìˆë‹¤ë©´ ë£¨íŠ¸ ë…¸ë“œ ìƒì„±
+   if (root == nullptr) {
+      root = new Node(true);
+      root->keys[0] = key;
+      root->values[0] = value;
+      root->keyCount = 1;
+      return;
+   }
 
-	// 2. µ¥ÀÌÅÍ°¡ µé¾î°¥ ¸®ÇÁ ³ëµå Å½»ö
-	Node* leaf = root;
-	// ·çÆ®°¡ ³»ºÎ ³ëµå(Internal Node)¶ó¸é ¸®ÇÁ±îÁö ³»·Á°¨
-	while (!leaf->isLeaf) {
-		int i = 0;
-		// ÇöÀç ³ëµåÀÇ Å°°ªµéÀ» ºñ±³ÇÏ¿© ÀûÀıÇÑ ÀÚ½Ä ³ëµå ÀÎµ¦½º¸¦ Ã£À½
-		while (i < leaf->keyCount && leaf->keys[i] <= key)
-			i++;
-		leaf = leaf->children[i];	// ÇØ´ç ÀÚ½Ä ³ëµå·Î Æ÷ÀÎÅÍ ÀÌµ¿
-	}
+   // 2. ë°ì´í„°ê°€ ë“¤ì–´ê°ˆ ë¦¬í”„ ë…¸ë“œ íƒìƒ‰
+   Node* leaf = root;
+   // ë£¨íŠ¸ê°€ ë‚´ë¶€ ë…¸ë“œ(Internal Node)ë¼ë©´ ë¦¬í”„ê¹Œì§€ ë‚´ë ¤ê°
+   while (!leaf->isLeaf) {
+      int i = 0;
+      // í˜„ì¬ ë…¸ë“œì˜ í‚¤ê°’ë“¤ì„ ë¹„êµí•˜ì—¬ ì ì ˆí•œ ìì‹ ë…¸ë“œ ì¸ë±ìŠ¤ë¥¼ ì°¾ìŒ
+      while (i < leaf->keyCount && leaf->keys[i] <= key)
+         i++;
+      leaf = leaf->children[i];   // í•´ë‹¹ ìì‹ ë…¸ë“œë¡œ í¬ì¸í„° ì´ë™
+   }
 
-	// 3. ¿¹¿Ü Ã³¸®: ³ëµå°¡ °¡µæ Ã¡À» ¶§
-	if (leaf->keyCount == ORDER) {
-		splitLeaf(leaf);
+   // 3. ì˜ˆì™¸ ì²˜ë¦¬: ë…¸ë“œê°€ ê°€ë“ ì°¼ì„ ë•Œ
+   if (leaf->keyCount == ORDER) {
+      splitLeaf(leaf);
 
-		// ÂÉ°³Áø ÈÄ¿¡´Â »õ·Î¿î ·çÆ®¿¡¼­ ´Ù½Ã ÀÚ¸®¸¦ Ã£±â
-		// ÀÏ´Ü Áö±İÀº ´Ü¼øÇÏ°Ô ÂÉ°³´Â °Í±îÁö¸¸ Å×½ºÆ®
-		Insert(key, value);
-		return;
-	}
+      // ìª¼ê°œì§„ í›„ì—ëŠ” ìƒˆë¡œìš´ ë£¨íŠ¸ì—ì„œ ë‹¤ì‹œ ìë¦¬ë¥¼ ì°¾ê¸°
+      // ì¼ë‹¨ ì§€ê¸ˆì€ ë‹¨ìˆœí•˜ê²Œ ìª¼ê°œëŠ” ê²ƒê¹Œì§€ë§Œ í…ŒìŠ¤íŠ¸
+      Insert(key, value);
+      return;
+   }
 
-	// 4. Á¤·ÄµÈ À§Ä¡¸¦ Ã£¾Æ »ğÀÔ (Insertion Sort)
-	int i = leaf->keyCount - 1;
-	while (i >= 0 && leaf->keys[i] > key) {
-		leaf->keys[i + 1] = leaf->keys[i];
-		leaf->values[i + 1] = leaf->values[i];
-		i--;
-	}
+   // 4. ì •ë ¬ëœ ìœ„ì¹˜ë¥¼ ì°¾ì•„ ì‚½ì… (Insertion Sort)
+   int i = leaf->keyCount - 1;
+   while (i >= 0 && leaf->keys[i] > key) {
+      leaf->keys[i + 1] = leaf->keys[i];
+      leaf->values[i + 1] = leaf->values[i];
+      i--;
+   }
 
-	// ºó ÀÚ¸®¿¡ Å°¿Í °ª ÇÒ´ç ¹× °³¼ö Áõ°¡
-	leaf->keys[i + 1] = key;
-	leaf->values[i + 1] = value;
-	leaf->keyCount++;
+   // ë¹ˆ ìë¦¬ì— í‚¤ì™€ ê°’ í• ë‹¹ ë° ê°œìˆ˜ ì¦ê°€
+   leaf->keys[i + 1] = key;
+   leaf->values[i + 1] = value;
+   leaf->keyCount++;
 
-	cout << "Inserted:" << key << endl;
+   cout << "Inserted:" << key << endl;
 }
 
 /*
-* @brief B+ Tree¿¡¼­ Æ¯Á¤ Key¿¡ ÇØ´çÇÏ´Â value °Ë»ö
+* @brief B+ Treeì—ì„œ íŠ¹ì • Keyì— í•´ë‹¹í•˜ëŠ” value ê²€ìƒ‰
 */
-string BPlusTree::Search(int key) {                         ///< Key·Î Value °Ë»ö (¾øÀ¸¸é ºó ¹®ÀÚ¿­)
-	if (root == nullptr) return "";                         ///< ¿¹¿ÜÃ³¸®
-	Node* cursor = root;
+string BPlusTree::Search(int key) {                         ///< Keyë¡œ Value ê²€ìƒ‰ (ì—†ìœ¼ë©´ ë¹ˆ ë¬¸ìì—´)
+   if (root == nullptr) return "";                         ///< ì˜ˆì™¸ì²˜ë¦¬
+   Node* cursor = root;
 
-	///< [Index Layer Å½»ö] ¸®ÇÁ³ëµå¿¡ µµ´ŞÇÒ ¶§±îÁö ³»·Á°¨
-	while (!cursor->isLeaf) {
-		int i = 0;
-		while (i < cursor->keyCount && key >= cursor->keys[i]) { ///< ¾î´À ÀÚ½ÄÀ¸·Î ³»·Á°¥Áö °áÁ¤
-			i++;
-		}
-		cursor = cursor->children[i];                           ///< °áÁ¤µÈ ÀÚ½Ä ³ëµå·Î Æ÷ÀÎÅÍ ÀÌµ¿
-	}
-	///< [Data Layer Å½»ö] ½ÇÁ¦ µ¥ÀÌÅÍ°¡ ÀÖ´Â ¸®ÇÁ ³ëµå µµÂø
-	for (int i = 0; i < cursor->keyCount; i++) {                ///< ³ëµå ³»ÀÇ Å°µéÀ»  ¼øÈ¸ÇÏ¸ç ÀÏÄ¡ÇÏ´Â °ªÀÌ ÀÖ´ÂÁö È®ÀÎ.
-		if (cursor->keys[i] == key)
-			return cursor->values[i];
-	}
-	return "";
+   ///< [Index Layer íƒìƒ‰] ë¦¬í”„ë…¸ë“œì— ë„ë‹¬í•  ë•Œê¹Œì§€ ë‚´ë ¤ê°
+   while (!cursor->isLeaf) {
+      int i = 0;
+      while (i < cursor->keyCount && key >= cursor->keys[i]) { ///< ì–´ëŠ ìì‹ìœ¼ë¡œ ë‚´ë ¤ê°ˆì§€ ê²°ì •
+         i++;
+      }
+      cursor = cursor->children[i];                           ///< ê²°ì •ëœ ìì‹ ë…¸ë“œë¡œ í¬ì¸í„° ì´ë™
+   }
+   ///< [Data Layer íƒìƒ‰] ì‹¤ì œ ë°ì´í„°ê°€ ìˆëŠ” ë¦¬í”„ ë…¸ë“œ ë„ì°©
+   for (int i = 0; i < cursor->keyCount; i++) {                ///< ë…¸ë“œ ë‚´ì˜ í‚¤ë“¤ì„  ìˆœíšŒí•˜ë©° ì¼ì¹˜í•˜ëŠ” ê°’ì´ ìˆëŠ”ì§€ í™•ì¸.
+      if (cursor->keys[i] == key)
+         return cursor->values[i];
+   }
+   return "";
 }
 
 /*
-* @brief ¸®ÇÁ ³ëµå°¡ ²Ë Ã¡À» ¶§ ¹İÀ¸·Î ºĞÇÒÇÏ°í ºÎ¸ğ¿¡°Ô ½Â°İ(Promote) ¿äÃ»
+* @brief ë¦¬í”„ ë…¸ë“œê°€ ê½‰ ì°¼ì„ ë•Œ ë°˜ìœ¼ë¡œ ë¶„í• í•˜ê³  ë¶€ëª¨ì—ê²Œ ìŠ¹ê²©(Promote) ìš”ì²­
 */
 void BPlusTree::splitLeaf(Node* leaf) {
-	// 1. »õ·Î¿î ÇüÁ¦ ³ëµå »ı¼º
-	Node* newLeaf = new Node(true);
+   // 1. ìƒˆë¡œìš´ í˜•ì œ ë…¸ë“œ ìƒì„±
+   Node* newLeaf = new Node(true);
 
-	// 2. ºĞÇÒ ±âÁØÁ¡ ¼³Á¤ (Áß°£ ÁöÁ¡)
-	int splitIndex = (ORDER + 1) / 2;
+   // 2. ë¶„í•  ê¸°ì¤€ì  ì„¤ì • (ì¤‘ê°„ ì§€ì )
+   int splitIndex = (ORDER + 1) / 2;
 
-	// 3. ±âÁ¸ ³ëµåÀÇ ¿À¸¥ÂÊ Àı¹İÀ» »õ ³ëµå·Î º¹»ç
-	int j = 0;
-	for (int i = splitIndex; i < ORDER; i++) {
-		newLeaf->keys[j] = leaf->keys[i];
-		newLeaf->values[j] = leaf->values[i];
-		j++;
-	}
+   // 3. ê¸°ì¡´ ë…¸ë“œì˜ ì˜¤ë¥¸ìª½ ì ˆë°˜ì„ ìƒˆ ë…¸ë“œë¡œ ë³µì‚¬
+   int j = 0;
+   for (int i = splitIndex; i < ORDER; i++) {
+      newLeaf->keys[j] = leaf->keys[i];
+      newLeaf->values[j] = leaf->values[i];
+      j++;
+   }
 
-	// 4. °¢ ³ëµåÀÇ Å° °³¼ö(KeyCount) °»½Å
-	leaf->keyCount = splitIndex;            // ±âÁ¸ ³ëµå´Â Àı¹İÀ¸·Î ÁÙ¾îµê
-	newLeaf->keyCount = ORDER - splitIndex; // ³ª¸ÓÁö´Â »õ ³ëµå°¡ °¡Áü
+   // 4. ê° ë…¸ë“œì˜ í‚¤ ê°œìˆ˜(KeyCount) ê°±ì‹ 
+   leaf->keyCount = splitIndex;            // ê¸°ì¡´ ë…¸ë“œëŠ” ì ˆë°˜ìœ¼ë¡œ ì¤„ì–´ë“¦
+   newLeaf->keyCount = ORDER - splitIndex; // ë‚˜ë¨¸ì§€ëŠ” ìƒˆ ë…¸ë“œê°€ ê°€ì§
 
-	// 5. ¸®ÇÁ ³ëµå ¿¬°á ¸®½ºÆ® ±¸Á¶ À¯Áö
-	newLeaf->nextLeaf = leaf->nextLeaf;     // »õ ³ëµå°¡ ±âÁ¸ ³ëµåÀÇ µŞºÎºĞÀ» °¡¸®Å´
-	leaf->nextLeaf = newLeaf;               // ±âÁ¸ ³ëµå°¡ »õ ³ëµå¸¦ °¡¸®Å´
+   // 5. ë¦¬í”„ ë…¸ë“œ ì—°ê²° ë¦¬ìŠ¤íŠ¸ êµ¬ì¡° ìœ ì§€
+   newLeaf->nextLeaf = leaf->nextLeaf;     // ìƒˆ ë…¸ë“œê°€ ê¸°ì¡´ ë…¸ë“œì˜ ë’·ë¶€ë¶„ì„ ê°€ë¦¬í‚´
+   leaf->nextLeaf = newLeaf;               // ê¸°ì¡´ ë…¸ë“œê°€ ìƒˆ ë…¸ë“œë¥¼ ê°€ë¦¬í‚´
 
-	// 6. ºÎ¸ğ ³ëµå¿¡ »õ Å° µî·Ï (½ÂÁø)
-	insertIntoParent(leaf, newLeaf->keys[0], newLeaf);
+   // 6. ë¶€ëª¨ ë…¸ë“œì— ìƒˆ í‚¤ ë“±ë¡ (ìŠ¹ì§„)
+   insertIntoParent(leaf, newLeaf->keys[0], newLeaf);
 }
 
 /*
-* @brief B+ Tree¿¡¼­ Æ®¸®ÀÇ ·çÆ®°¡ ºĞÇÒ(Split)µÇ¾î »õ·Î¿î ·çÆ®¸¦ »ı¼ºÇÏ´Â ·ÎÁ÷
+* @brief B+ Treeì—ì„œ íŠ¸ë¦¬ì˜ ë£¨íŠ¸ê°€ ë¶„í• (Split)ë˜ì–´ ìƒˆë¡œìš´ ë£¨íŠ¸ë¥¼ ìƒì„±í•˜ëŠ” ë¡œì§
 */
 void BPlusTree::insertIntoParent(Node* left, int key, Node* right) {
-	// 1. [Root Split] ºÎ¸ğ°¡ ¾ø´Â °æ¿ì (Left°¡ °ğ RootÀÎ °æ¿ì)
-	// Æ®¸®ÀÇ ³ôÀÌ(Height)°¡ 1 Áõ°¡ÇÏ¸ç »õ·Î¿î ·çÆ®°¡ »ı¼ºµÊ
-	if (root == left) {
-		Node* newRoot = new Node(false);
-		newRoot->keys[0] = key;             ///< »õ ·çÆ®ÀÇ Ã¹ ¹øÂ° Å° ¼³Á¤
-		newRoot->children[0] = left;        ///< ¿ŞÂÊ ÀÚ½Ä ¿¬°á
-		newRoot->children[1] = right;       ///< ¿À¸¥ÂÊ ÀÚ½Ä ¿¬°á
-		newRoot->keyCount = 1;
+   // 1. [Root Split] ë¶€ëª¨ê°€ ì—†ëŠ” ê²½ìš° (Leftê°€ ê³§ Rootì¸ ê²½ìš°)
+   // íŠ¸ë¦¬ì˜ ë†’ì´(Height)ê°€ 1 ì¦ê°€í•˜ë©° ìƒˆë¡œìš´ ë£¨íŠ¸ê°€ ìƒì„±ë¨
+   if (root == left) {
+      Node* newRoot = new Node(false);
+      newRoot->keys[0] = key;             ///< ìƒˆ ë£¨íŠ¸ì˜ ì²« ë²ˆì§¸ í‚¤ ì„¤ì •
+      newRoot->children[0] = left;        ///< ì™¼ìª½ ìì‹ ì—°ê²°
+      newRoot->children[1] = right;       ///< ì˜¤ë¥¸ìª½ ìì‹ ì—°ê²°
+      newRoot->keyCount = 1;
 
-		left->parent = newRoot;             ///< ÀÚ½ÄµéÀÇ ºÎ¸ğ Æ÷ÀÎÅÍ °»½Å
-		right->parent = newRoot;
-		root = newRoot;                     ///< Àü¿ª ·çÆ® Æ÷ÀÎÅÍ °»½Å
-		return;
-	}
+      left->parent = newRoot;             ///< ìì‹ë“¤ì˜ ë¶€ëª¨ í¬ì¸í„° ê°±ì‹ 
+      right->parent = newRoot;
+      root = newRoot;                     ///< ì „ì—­ ë£¨íŠ¸ í¬ì¸í„° ê°±ì‹ 
+      return;
+   }
 
-	// 2. [General Insert] ÀÌ¹Ì ºÎ¸ğ°¡ Á¸ÀçÇÏ´Â °æ¿ì
-	// ºÎ¸ğ ³ëµå¿¡ ÀÚ¸®°¡ ÀÖ´ÂÁö È®ÀÎÇÏ°í Á¤·ÄÇÏ¿© »ğÀÔ
-	else {
-		Node* parent = left->parent;
+   // 2. [General Insert] ì´ë¯¸ ë¶€ëª¨ê°€ ì¡´ì¬í•˜ëŠ” ê²½ìš°
+   // ë¶€ëª¨ ë…¸ë“œì— ìë¦¬ê°€ ìˆëŠ”ì§€ í™•ì¸í•˜ê³  ì •ë ¬í•˜ì—¬ ì‚½ì…
+   else {
+      Node* parent = left->parent;
 
-		// µé¾î°¥ À§Ä¡ Ã£±â ¹× ÀÚ¸® ¸¸µé±â (Shift Right)
-		// Å°¿Í ÀÚ½Ä Æ÷ÀÎÅÍ¸¦ ÇÑ Ä­¾¿ µÚ·Î ¹Ğ¾î °ø°£ È®º¸
-		int i = parent->keyCount - 1;
-		while (i >= 0 && parent->keys[i] > key) {
-			parent->keys[i + 1] = parent->keys[i];
-			parent->children[i + 2] = parent->children[i + 1]; // Æ÷ÀÎÅÍµµ °°ÀÌ ÀÌµ¿
-			i--;
-		}
+      // ë“¤ì–´ê°ˆ ìœ„ì¹˜ ì°¾ê¸° ë° ìë¦¬ ë§Œë“¤ê¸° (Shift Right)
+      // í‚¤ì™€ ìì‹ í¬ì¸í„°ë¥¼ í•œ ì¹¸ì”© ë’¤ë¡œ ë°€ì–´ ê³µê°„ í™•ë³´
+      int i = parent->keyCount - 1;
+      while (i >= 0 && parent->keys[i] > key) {
+         parent->keys[i + 1] = parent->keys[i];
+         parent->children[i + 2] = parent->children[i + 1]; // í¬ì¸í„°ë„ ê°™ì´ ì´ë™
+         i--;
+      }
 
-		// ºó ÀÚ¸®¿¡ Å°¿Í Æ÷ÀÎÅÍ »ğÀÔ
-		parent->keys[i + 1] = key;
-		parent->children[i + 2] = right;
-		parent->keyCount++;
+      // ë¹ˆ ìë¦¬ì— í‚¤ì™€ í¬ì¸í„° ì‚½ì…
+      parent->keys[i + 1] = key;
+      parent->children[i + 2] = right;
+      parent->keyCount++;
 
-		right->parent = parent; // »õ ÀÚ½ÄÀÇ ºÎ¸ğ ¿¬°á
+      right->parent = parent; // ìƒˆ ìì‹ì˜ ë¶€ëª¨ ì—°ê²°
 
-		// 3. [Overflow Handling] ºÎ¸ğ ³ëµåµµ ²Ë Ã¡À» °æ¿ì
-		// ³»ºÎ ³ëµå ºĞÇÒ(Split Internal)À» Àç±ÍÀûÀ¸·Î È£Ãâ
-		if (parent->keyCount == ORDER) {
-			splitInternal(parent);
-		}
-	}
+      // 3. [Overflow Handling] ë¶€ëª¨ ë…¸ë“œë„ ê½‰ ì°¼ì„ ê²½ìš°
+      // ë‚´ë¶€ ë…¸ë“œ ë¶„í• (Split Internal)ì„ ì¬ê·€ì ìœ¼ë¡œ í˜¸ì¶œ
+      if (parent->keyCount == ORDER) {
+         splitInternal(parent);
+      }
+   }
 }
 
 /*
-* @brief ³»ºÎ ³ëµå(Internal Node)°¡ ²Ë Ã¡À» ¶§ ºĞÇÒÇÏ°í Áß°£ Å°¸¦ ºÎ¸ğ·Î ¿Ã¸²
+* @brief ë‚´ë¶€ ë…¸ë“œ(Internal Node)ê°€ ê½‰ ì°¼ì„ ë•Œ ë¶„í• í•˜ê³  ì¤‘ê°„ í‚¤ë¥¼ ë¶€ëª¨ë¡œ ì˜¬ë¦¼
 */
 void BPlusTree::splitInternal(Node* parent) {
-	// 1. »õ·Î¿î ³»ºÎ ³ëµå »ı¼º (Leaf ¾Æ´Ô)
-	Node* newInternal = new Node(false);
+   // 1. ìƒˆë¡œìš´ ë‚´ë¶€ ë…¸ë“œ ìƒì„± (Leaf ì•„ë‹˜)
+   Node* newInternal = new Node(false);
 
-	// 2. ºĞÇÒ ±âÁØÁ¡ ¼³Á¤
-	int splitIndex = (ORDER + 1) / 2;
+   // 2. ë¶„í•  ê¸°ì¤€ì  ì„¤ì •
+   int splitIndex = (ORDER + 1) / 2;
 
-	// 3. ºÎ¸ğ·Î ¿Ã¶ó°¥ Áß°£ Å° ¹é¾÷ (³»ºÎ ³ëµå¿¡¼­´Â ÀÌ °ªÀÌ »ç¶óÁü)
-	int backupkey = parent->keys[splitIndex];
+   // 3. ë¶€ëª¨ë¡œ ì˜¬ë¼ê°ˆ ì¤‘ê°„ í‚¤ ë°±ì—… (ë‚´ë¶€ ë…¸ë“œì—ì„œëŠ” ì´ ê°’ì´ ì‚¬ë¼ì§)
+   int backupkey = parent->keys[splitIndex];
 
-	// 4. ±âÁ¸ ³ëµåÀÇ ¿À¸¥ÂÊ Àı¹İÀ» »õ ³ëµå·Î ÀÌ»ç
-	int j = 0;
-	for (int i = splitIndex + 1; i < ORDER; i++) {
-		newInternal->keys[j] = parent->keys[i];
-		newInternal->children[j] = parent->children[i]; // Å°¿Í ¿ŞÂÊ ÀÚ½Ä Æ÷ÀÎÅÍ¸¦ ½ÖÀ¸·Î ÀÌµ¿
-		j++;
-	}
-	// ·çÇÁ¿¡¼­ Ã³¸®µÇÁö ¾ÊÀº ¸¶Áö¸· ÀÚ½Ä Æ÷ÀÎÅÍ ÀÌµ¿
-	newInternal->children[j] = parent->children[ORDER];
+   // 4. ê¸°ì¡´ ë…¸ë“œì˜ ì˜¤ë¥¸ìª½ ì ˆë°˜ì„ ìƒˆ ë…¸ë“œë¡œ ì´ì‚¬
+   int j = 0;
+   for (int i = splitIndex + 1; i < ORDER; i++) {
+      newInternal->keys[j] = parent->keys[i];
+      newInternal->children[j] = parent->children[i]; // í‚¤ì™€ ì™¼ìª½ ìì‹ í¬ì¸í„°ë¥¼ ìŒìœ¼ë¡œ ì´ë™
+      j++;
+   }
+   // ë£¨í”„ì—ì„œ ì²˜ë¦¬ë˜ì§€ ì•Šì€ ë§ˆì§€ë§‰ ìì‹ í¬ì¸í„° ì´ë™
+   newInternal->children[j] = parent->children[ORDER];
 
-	// 5. Å° °³¼ö(KeyCount) °»½Å
-	parent->keyCount = splitIndex;
-	newInternal->keyCount = ORDER - splitIndex - 1;
+   // 5. í‚¤ ê°œìˆ˜(KeyCount) ê°±ì‹ 
+   parent->keyCount = splitIndex;
+   newInternal->keyCount = ORDER - splitIndex - 1;
 
-	// 6. ÀÌ»ç °£ ÀÚ½Ä ³ëµåµéÀÇ ºÎ¸ğ Æ÷ÀÎÅÍ¸¦ »õ ³ëµå·Î º¯°æ
-	for (int i = 0; i <= newInternal->keyCount; i++) {
-		Node* child = newInternal->children[i];
-		child->parent = newInternal;
-	}
+   // 6. ì´ì‚¬ ê°„ ìì‹ ë…¸ë“œë“¤ì˜ ë¶€ëª¨ í¬ì¸í„°ë¥¼ ìƒˆ ë…¸ë“œë¡œ ë³€ê²½
+   for (int i = 0; i <= newInternal->keyCount; i++) {
+      Node* child = newInternal->children[i];
+      child->parent = newInternal;
+   }
 
-	// 7. ºÎ¸ğ ³ëµå¿¡ Áß°£ Å° µî·Ï (Àç±Í È£Ãâ)
-	insertIntoParent(parent, backupkey, newInternal);
+   // 7. ë¶€ëª¨ ë…¸ë“œì— ì¤‘ê°„ í‚¤ ë“±ë¡ (ì¬ê·€ í˜¸ì¶œ)
+   insertIntoParent(parent, backupkey, newInternal);
 }
 
 void BPlusTree::PrintTree() {
-	// Æ®¸®°¡ ºñ¾îÀÖ´ÂÁö È®ÀÎ
-	if (root == nullptr) {
-		std::cout << "Tree is empty." << std::endl;
-		return;
-	}
+   // íŠ¸ë¦¬ê°€ ë¹„ì–´ìˆëŠ”ì§€ í™•ì¸
+   if (root == nullptr) {
+      std::cout << "Tree is empty." << std::endl;
+      return;
+   }
 
-	// BFS¸¦ À§ÇÑ Å¥ ¼±¾ğ (std::queue »ç¿ë)
-	std::queue<Node*> q;
-	q.push(root);
+   // BFSë¥¼ ìœ„í•œ í ì„ ì–¸ (std::queue ì‚¬ìš©)
+   std::queue<Node*> q;
+   q.push(root);
 
-	int level = 0;
-	std::cout << "=== B+ Tree Structure (BFS) ===" << std::endl;
+   int level = 0;
+   std::cout << "=== B+ Tree Structure (BFS) ===" << std::endl;
 
-	while (!q.empty()) {
-		int levelSize = q.size(); // ÇöÀç ·¹º§¿¡ ÀÖ´Â ³ëµåÀÇ °³¼ö
+   while (!q.empty()) {
+      int levelSize = q.size(); // í˜„ì¬ ë ˆë²¨ì— ìˆëŠ” ë…¸ë“œì˜ ê°œìˆ˜
 
-		std::cout << "Level " << level << ": ";
+      std::cout << "Level " << level << ": ";
 
-		// ÇöÀç ·¹º§ÀÇ ¸ğµç ³ëµå¸¦ ¼øÈ¸
-		for (int i = 0; i < levelSize; i++) {
-			Node* curr = q.front();
-			q.pop();
+      // í˜„ì¬ ë ˆë²¨ì˜ ëª¨ë“  ë…¸ë“œë¥¼ ìˆœíšŒ
+      for (int i = 0; i < levelSize; i++) {
+         Node* curr = q.front();
+         q.pop();
 
-			std::cout << "[ ";
-			for (int j = 0; j < curr->keyCount; j++) {
-				// 1. Å°(Key) Ãâ·Â
-				std::cout << curr->keys[j];
+         std::cout << "[ ";
+         for (int j = 0; j < curr->keyCount; j++) {
+            // 1. í‚¤(Key) ì¶œë ¥
+            std::cout << curr->keys[j];
 
-				// 2. ¸®ÇÁ ³ëµå¶ó¸é µ¥ÀÌÅÍ(Value)µµ ÇÔ²² Ãâ·Â
-				if (curr->isLeaf) {
-					std::cout << "(" << curr->values[j] << ")";
-				}
+            // 2. ë¦¬í”„ ë…¸ë“œë¼ë©´ ë°ì´í„°(Value)ë„ í•¨ê»˜ ì¶œë ¥
+            if (curr->isLeaf) {
+               std::cout << "(" << curr->values[j] << ")";
+            }
 
-				// ¸¶Áö¸· Å°°¡ ¾Æ´Ï¶ó¸é °ø¹é Ãß°¡
-				if (j < curr->keyCount - 1) {
-					std::cout << " ";
-				}
-			}
-			std::cout << " ] ";
+            // ë§ˆì§€ë§‰ í‚¤ê°€ ì•„ë‹ˆë¼ë©´ ê³µë°± ì¶”ê°€
+            if (j < curr->keyCount - 1) {
+               std::cout << " ";
+            }
+         }
+         std::cout << " ] ";
 
-			// ³»ºÎ ³ëµå¶ó¸é ÀÚ½ÄµéÀ» Å¥¿¡ Ãß°¡
-			if (!curr->isLeaf) {
-				// ÀÚ½Ä Æ÷ÀÎÅÍ °³¼ö´Â Å° °³¼ö + 1
-				for (int j = 0; j <= curr->keyCount; j++) {
-					if (curr->children[j] != nullptr) {
-						q.push(curr->children[j]);
-					}
-				}
-			}
-		}
-		// ·¹º§ º¯°æ ½Ã ÁÙ¹Ù²Ş
-		std::cout << std::endl;
-		level++;
-	}
-	std::cout << "===============================" << std::endl;
+         // ë‚´ë¶€ ë…¸ë“œë¼ë©´ ìì‹ë“¤ì„ íì— ì¶”ê°€
+         if (!curr->isLeaf) {
+            // ìì‹ í¬ì¸í„° ê°œìˆ˜ëŠ” í‚¤ ê°œìˆ˜ + 1
+            for (int j = 0; j <= curr->keyCount; j++) {
+               if (curr->children[j] != nullptr) {
+                  q.push(curr->children[j]);
+               }
+            }
+         }
+      }
+      // ë ˆë²¨ ë³€ê²½ ì‹œ ì¤„ë°”ê¿ˆ
+      std::cout << std::endl;
+      level++;
+   }
+   std::cout << "===============================" << std::endl;
 }
 
 /**
- * @brief Å°¿¡ ÇØ´çÇÏ´Â °ª °Ë»ö
- * @return Ã£Àº °ª (½ÇÆĞ ½Ã ºó ¹®ÀÚ¿­)
+ * @brief í‚¤ì— í•´ë‹¹í•˜ëŠ” ê°’ ê²€ìƒ‰
+ * @return ì°¾ì€ ê°’ (ì‹¤íŒ¨ ì‹œ ë¹ˆ ë¬¸ìì—´)
  */
 string BPlusTree::Search(int key) {
-	// 1. ¿¹¿Ü Ã³¸®: Æ®¸®°¡ ºñ¾îÀÖ´Â °æ¿ì
-	if (root == nullptr) return "";
+   // 1. ì˜ˆì™¸ ì²˜ë¦¬: íŠ¸ë¦¬ê°€ ë¹„ì–´ìˆëŠ” ê²½ìš°
+   if (root == nullptr) return "";
 
-	Node* cursor = root;
+   Node* cursor = root;
 
-	// 2. ¸®ÇÁ ³ëµå±îÁö ÇÏÇâ Å½»ö
-	while (cursor->isLeaf == false) {
-		int i = 0;
-		// ÇöÀç ³ëµåÀÇ Å°µé°ú ºñ±³ÇÏ¿©, Ã£À¸·Á´Â Å°°¡ Æ÷ÇÔµÈ ÀÚ½Ä ³ëµå
-		while (i < cursor->keyCount && key >= cursor->keys[i]) {
-			i++;
-		}
-		cursor = cursor->children[i];	// ÇØ´ç ÀÚ½Ä ³ëµå·Î Æ÷ÀÎÅÍ ÀÌµ¿
-	}
+   // 2. ë¦¬í”„ ë…¸ë“œê¹Œì§€ í•˜í–¥ íƒìƒ‰
+   while (cursor->isLeaf == false) {
+      int i = 0;
+      // í˜„ì¬ ë…¸ë“œì˜ í‚¤ë“¤ê³¼ ë¹„êµí•˜ì—¬, ì°¾ìœ¼ë ¤ëŠ” í‚¤ê°€ í¬í•¨ëœ ìì‹ ë…¸ë“œ
+      while (i < cursor->keyCount && key >= cursor->keys[i]) {
+         i++;
+      }
+      cursor = cursor->children[i];   // í•´ë‹¹ ìì‹ ë…¸ë“œë¡œ í¬ì¸í„° ì´ë™
+   }
 
-	// 3. Å° Á¸Àç ¿©ºÎ È®ÀÎ ¹× ¹İÈ¯
-	for (int i = 0; i < cursor->keyCount; i++) {
-		// Å°¸¦ Ã£¾Ò´Ù¸é ´ëÀÀÇÏ´Â °ªÀ» ¹İÈ¯
-		if (cursor->keys[i] == key) {
-			return cursor->values[i];
-		}
-	}
-	// 4. ¸®ÇÁ ³ëµå¸¦ ´Ù Ã£¾ÆºÃÁö¸¸ Å°°¡ ¾ø´Â °æ¿ì
-	return "";
+   // 3. í‚¤ ì¡´ì¬ ì—¬ë¶€ í™•ì¸ ë° ë°˜í™˜
+   for (int i = 0; i < cursor->keyCount; i++) {
+      // í‚¤ë¥¼ ì°¾ì•˜ë‹¤ë©´ ëŒ€ì‘í•˜ëŠ” ê°’ì„ ë°˜í™˜
+      if (cursor->keys[i] == key) {
+         return cursor->values[i];
+      }
+   }
+   // 4. ë¦¬í”„ ë…¸ë“œë¥¼ ë‹¤ ì°¾ì•„ë´¤ì§€ë§Œ í‚¤ê°€ ì—†ëŠ” ê²½ìš°
+   return "";
 }
 
 /**
- * @brief ¹üÀ§ °Ë»ö (Start ~ End)
- * @details ¸®ÇÁ ³ëµå Å½»ö ÈÄ ¿¬°á ¸®½ºÆ® ¼øÈ¸
+ * @brief ë²”ìœ„ ê²€ìƒ‰ (Start ~ End)
+ * @details ë¦¬í”„ ë…¸ë“œ íƒìƒ‰ í›„ ì—°ê²° ë¦¬ìŠ¤íŠ¸ ìˆœíšŒ
  */
 void BPlusTree::RangeSearch(int startKey, int endKey) {
-	// 1. ¿¹¿Ü Ã³¸®: Æ®¸®°¡ ºñ¾îÀÖ´Â °æ¿ì
-	if (root == nullptr) return;
+   // 1. ì˜ˆì™¸ ì²˜ë¦¬: íŠ¸ë¦¬ê°€ ë¹„ì–´ìˆëŠ” ê²½ìš°
+   if (root == nullptr) return;
 
-	Node* cursor = root;
+   Node* cursor = root;
 
-	// 2. ½ÃÀÛÁ¡ Å½»ö
-	while (cursor->isLeaf == false) {
-		int i = 0;
-		// startKey°¡ µé¾î°¥ ¼ö ÀÖ´Â À§Ä¡¸¦ Å½»ö
-		while (i < cursor->keyCount && startKey >= cursor->keys[i]) {
-			i++;
-		}
-		cursor = cursor->children[i];
-	}
+   // 2. ì‹œì‘ì  íƒìƒ‰
+   while (cursor->isLeaf == false) {
+      int i = 0;
+      // startKeyê°€ ë“¤ì–´ê°ˆ ìˆ˜ ìˆëŠ” ìœ„ì¹˜ë¥¼ íƒìƒ‰
+      while (i < cursor->keyCount && startKey >= cursor->keys[i]) {
+         i++;
+      }
+      cursor = cursor->children[i];
+   }
 
-	cout << "Range result: ";
-	bool finish = false;	// Å½»ö Á¾·á ÇÃ·¡±×
+   cout << "Range result: ";
+   bool finish = false;   // íƒìƒ‰ ì¢…ë£Œ í”Œë˜ê·¸
 
-	// 3. ¸®ÇÁ ³ëµå ¿¬°á ¸®½ºÆ®¸¦ µû¶ó È¾´Ü Å½»ö
-	while (cursor != nullptr && finish == false) {
-		for (int i = 0; i < cursor->keyCount; i++) {		// ÇöÀç ³ëµå ³»ÀÇ ¸ğµç Å°¸¦ ¼øÈ¸
-			// Á¶°Ç 1: Å°°¡ ¹üÀ§ ³»¿¡ Æ÷ÇÔµÇ´Â °æ¿ì -> Ãâ·Â
-			if (cursor->keys[i] >= startKey && cursor->keys[i] <= endKey) {
-				cout << "(" << cursor->keys[i] << ":" << cursor->values[i] << ") ";
-			}
-			// Á¶°Ç 2: Å°°¡ Á¾·á Å°(endKey)¸¦ ³Ñ¾î¼± °æ¿ì -> Á¾·á
-			else if (cursor->keys[i] > endKey) {
-				finish = true;
-				break;
-			}
-		}
-		// ÇöÀç ³ëµå Å½»öÀÌ ³¡³ª¸é ´ÙÀ½ ÇüÁ¦ ³ëµå(Sibling)·Î ÀÌµ¿
-		cursor = cursor->nextLeaf;
-	}
-	cout << endl;
+   // 3. ë¦¬í”„ ë…¸ë“œ ì—°ê²° ë¦¬ìŠ¤íŠ¸ë¥¼ ë”°ë¼ íš¡ë‹¨ íƒìƒ‰
+   while (cursor != nullptr && finish == false) {
+      for (int i = 0; i < cursor->keyCount; i++) {      // í˜„ì¬ ë…¸ë“œ ë‚´ì˜ ëª¨ë“  í‚¤ë¥¼ ìˆœíšŒ
+         // ì¡°ê±´ 1: í‚¤ê°€ ë²”ìœ„ ë‚´ì— í¬í•¨ë˜ëŠ” ê²½ìš° -> ì¶œë ¥
+         if (cursor->keys[i] >= startKey && cursor->keys[i] <= endKey) {
+            cout << "(" << cursor->keys[i] << ":" << cursor->values[i] << ") ";
+         }
+         // ì¡°ê±´ 2: í‚¤ê°€ ì¢…ë£Œ í‚¤(endKey)ë¥¼ ë„˜ì–´ì„  ê²½ìš° -> ì¢…ë£Œ
+         else if (cursor->keys[i] > endKey) {
+            finish = true;
+            break;
+         }
+      }
+      // í˜„ì¬ ë…¸ë“œ íƒìƒ‰ì´ ëë‚˜ë©´ ë‹¤ìŒ í˜•ì œ ë…¸ë“œ(Sibling)ë¡œ ì´ë™
+      cursor = cursor->nextLeaf;
+   }
+   cout << endl;
+}
