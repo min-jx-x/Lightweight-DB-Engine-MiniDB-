@@ -29,7 +29,7 @@ void BPlusTree::Insert(int key, string value) {
 		// 현재 노드의 키값들을 비교하여 적절한 자식 노드 인덱스를 찾음
 		while (i < leaf->keyCount && leaf->keys[i] <= key)
 			i++;
-		leaf = leaf->children[i];   // 해당 자식 노드로 포인터 이동
+		leaf = leaf->children[i];	// 해당 자식 노드로 포인터 이동
 	}
 
 	// 3. 예외 처리: 노드가 가득 찼을 때
@@ -61,20 +61,20 @@ void BPlusTree::Insert(int key, string value) {
 /*
 * @brief B+ Tree에서 특정 Key에 해당하는 value 검색
 */
-string BPlusTree::Search(int key) {							  ///< Key로 Value 검색 (없으면 빈 문자열)
-	if (root == nullptr) return "";							  ///< 예외처리
+string BPlusTree::Search(int key) {                         ///< Key로 Value 검색 (없으면 빈 문자열)
+	if (root == nullptr) return "";                         ///< 예외처리
 	Node* cursor = root;
 
 	///< [Index Layer 탐색] 리프노드에 도달할 때까지 내려감
 	while (!cursor->isLeaf) {
 		int i = 0;
-		while (i < cursor->keyCount && key >= cursor->keys[i]) {  ///< 어느 자식으로 내려갈지 결정
+		while (i < cursor->keyCount && key >= cursor->keys[i]) { ///< 어느 자식으로 내려갈지 결정
 			i++;
 		}
-		cursor = cursor->children[i];							  ///< 결정된 자식 노드로 포인터 이동
+		cursor = cursor->children[i];                           ///< 결정된 자식 노드로 포인터 이동
 	}
 	///< [Data Layer 탐색] 실제 데이터가 있는 리프 노드 도착
-	for (int i = 0; i < cursor->keyCount; i++) {				  ///< 노드 내의 키들을  순회하며 일치하는 값이 있는지 확인.
+	for (int i = 0; i < cursor->keyCount; i++) {                ///< 노드 내의 키들을  순회하며 일치하는 값이 있는지 확인.
 		if (cursor->keys[i] == key)
 			return cursor->values[i];
 	}
@@ -82,11 +82,41 @@ string BPlusTree::Search(int key) {							  ///< Key로 Value 검색 (없으면 빈 문�
 }
 
 /*
+* @brief 리프 노드가 꽉 찼을 때 반으로 분할하고 부모에게 승격(Promote) 요청
+*/
+void BPlusTree::splitLeaf(Node* leaf) {
+	// 1. 새로운 형제 노드 생성
+	Node* newLeaf = new Node(true);
+
+	// 2. 분할 기준점 설정 (중간 지점)
+	int splitIndex = (ORDER + 1) / 2;
+
+	// 3. 기존 노드의 오른쪽 절반을 새 노드로 복사
+	int j = 0;
+	for (int i = splitIndex; i < ORDER; i++) {
+		newLeaf->keys[j] = leaf->keys[i];
+		newLeaf->values[j] = leaf->values[i];
+		j++;
+	}
+
+	// 4. 각 노드의 키 개수(KeyCount) 갱신
+	leaf->keyCount = splitIndex;            // 기존 노드는 절반으로 줄어듦
+	newLeaf->keyCount = ORDER - splitIndex; // 나머지는 새 노드가 가짐
+
+	// 5. 리프 노드 연결 리스트 구조 유지
+	newLeaf->nextLeaf = leaf->nextLeaf;     // 새 노드가 기존 노드의 뒷부분을 가리킴
+	leaf->nextLeaf = newLeaf;               // 기존 노드가 새 노드를 가리킴
+
+	// 6. 부모 노드에 새 키 등록 (승진)
+	insertIntoParent(leaf, newLeaf->keys[0], newLeaf);
+}
+
+/*
 * @brief B+ Tree에서 트리의 루트가 분할(Split)되어 새로운 루트를 생성하는 로직
 */
 void BPlusTree::insertIntoParent(Node* left, int key, Node* right) {
 	// 1. [Root Split] 부모가 없는 경우 (Left가 곧 Root인 경우)
-   // 트리의 높이(Height)가 1 증가하며 새로운 루트가 생성됨
+	// 트리의 높이(Height)가 1 증가하며 새로운 루트가 생성됨
 	if (root == left) {
 		Node* newRoot = new Node(false);
 		newRoot->keys[0] = key;             ///< 새 루트의 첫 번째 키 설정
@@ -127,36 +157,6 @@ void BPlusTree::insertIntoParent(Node* left, int key, Node* right) {
 			splitInternal(parent);
 		}
 	}
-}
-
-/*
-* @brief 리프 노드가 꽉 찼을 때 반으로 분할하고 부모에게 승격(Promote) 요청
-*/
-void BPlusTree::splitLeaf(Node* leaf) {
-	// 1. 새로운 형제 노드 생성
-	Node* newLeaf = new Node(true);
-
-	// 2. 분할 기준점 설정 (중간 지점)
-	int splitIndex = (ORDER + 1) / 2;
-
-	// 3. 기존 노드의 오른쪽 절반을 새 노드로 복사
-	int j = 0;
-	for (int i = splitIndex; i < ORDER; i++) {
-		newLeaf->keys[j] = leaf->keys[i];
-		newLeaf->values[j] = leaf->values[i];
-		j++;
-	}
-
-	// 4. 각 노드의 키 개수(KeyCount) 갱신
-	leaf->keyCount = splitIndex;            // 기존 노드는 절반으로 줄어듦
-	newLeaf->keyCount = ORDER - splitIndex; // 나머지는 새 노드가 가짐
-
-	// 5. 리프 노드 연결 리스트 구조 유지
-	newLeaf->nextLeaf = leaf->nextLeaf;     // 새 노드가 기존 노드의 뒷부분을 가리킴
-	leaf->nextLeaf = newLeaf;               // 기존 노드가 새 노드를 가리킴
-
-	// 6. 부모 노드에 새 키 등록 (승진)
-	insertIntoParent(leaf, newLeaf->keys[0], newLeaf);
 }
 
 /*
