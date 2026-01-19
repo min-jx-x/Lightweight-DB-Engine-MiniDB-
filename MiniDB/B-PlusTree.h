@@ -48,6 +48,7 @@ public:
     BPlusTree(); ///< 생성자
 
     string Search(int key);             ///< Key로 Value 검색 (없으면 빈 문자열)
+    void RangeSearch(int startKey, int endKey);         ///< 범위 탐색 함수: startKey부터 endKey까지의 모든 데이터 출력
     void Insert(int key, string value); ///< 새로운 Key-Value 쌍 삽입
     void PrintTree();                   ///< 트리 구조 전체 출력 (디버깅)
 };
