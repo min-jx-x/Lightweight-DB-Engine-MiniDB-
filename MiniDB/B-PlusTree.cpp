@@ -5,6 +5,14 @@
 #include <string>
 
 /**
+ * @brief 생성자: DiskManager를 연결하고 초기화
+ */
+BPlusTree::BPlusTree(DiskManager* dm) : diskManager(dm) {
+    // 일단 새 트리라고 가정하고 루트 페이지가 없다고(-1) 설정
+    rootPageID = -1;
+}
+
+/**
  * @brief B+ 트리에 키-값 쌍을 삽입합니다.
  * @details 루트부터 탐색하여 적절한 리프 노드를 찾고, 데이터를 삽입합니다.
  * 노드가 가득 찬 경우 분할(Split)을 수행합니다.
@@ -59,26 +67,47 @@ void BPlusTree::Insert(int key, string value) {
 }
 
 /*
-* @brief B+ Tree에서 특정 Key에 해당하는 value 검색
+* @brief Disk-version:B+ Tree에서 특정 Key에 해당하는 value 검색
+* @details 루트 페이지부터 리프 페이지까지 PageID를 타고 내려가며 탐색합니다.
 */
-string BPlusTree::Search(int key) {                         ///< Key로 Value 검색 (없으면 빈 문자열)
-   if (root == nullptr) return "";                         ///< 예외처리
-   Node* cursor = root;
+string BPlusTree::Search(int key) {
+    // 1. 예외 처리: 트리가 비어있는 경우 (루트가 존재하지 않음)
+    if (rootPageID == -1) return "";
 
-   ///< [Index Layer 탐색] 리프노드에 도달할 때까지 내려감
-   while (!cursor->isLeaf) {
-      int i = 0;
-      while (i < cursor->keyCount && key >= cursor->keys[i]) { ///< 어느 자식으로 내려갈지 결정
-         i++;
-      }
-      cursor = cursor->children[i];                           ///< 결정된 자식 노드로 포인터 이동
-   }
-   ///< [Data Layer 탐색] 실제 데이터가 있는 리프 노드 도착
-   for (int i = 0; i < cursor->keyCount; i++) {                ///< 노드 내의 키들을  순회하며 일치하는 값이 있는지 확인.
-      if (cursor->keys[i] == key)
-         return cursor->values[i];
-   }
-   return "";
+    int cursorPageID = rootPageID;  ///< 현재 탐색 중인 페이지의 번호 (책 쪽수)
+    TreePage cursorPage;            ///< 디스크에서 읽어온 페이지 데이터를 담을 버퍼 (책 내용)
+
+    // 2. [Index Layer 탐색] 리프 노드에 도달할 때까지 아래로 내려감
+    while (true) {
+        // [Disk I/O] TreePage를 Page&로 강제 형변환하여 데이터를 읽어옵니다.
+        diskManager->ReadPage(cursorPageID, reinterpret_cast<Page&>(cursorPage));
+
+        // 도착한 페이지가 리프 노드라면 탐색 종료 (데이터는 여기에 있음)
+        if (cursorPage.isLeaf) {
+            break;
+        }
+
+        // [Internal Node] 어느 자식 페이지로 내려갈지 결정
+        int i = 0;
+        // 현재 노드의 키들을 순회하며, 내가 찾는 key가 들어갈 위치 탐색
+        while (i < cursorPage.keyCount && key >= cursorPage.keys[i]) {
+            i++;
+        }
+
+        // 찾은 위치(index)에 해당하는 자식 페이지 ID로 커서 이동
+        cursorPageID = cursorPage.childrenPageIDs[i];
+    }
+
+    // 3. [Data Layer 탐색] 리프 노드 내부에서 실제 데이터(Value) 찾기
+    for (int i = 0; i < cursorPage.keyCount; i++) {
+        // 키값이 일치하는지 확인
+        if (cursorPage.keys[i] == key) {
+            // char 배열(C-String)을 std::string으로 변환하여 반환
+            return string(cursorPage.values[i]);
+        }
+    }
+
+    return ""; ///< 리프 노드를 다 뒤졌으나 해당 키가 없음
 }
 
 /*
