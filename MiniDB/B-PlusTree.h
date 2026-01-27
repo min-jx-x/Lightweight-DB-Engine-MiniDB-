@@ -25,6 +25,7 @@ public:
     // 생성자: DiskManager 포인터를 받아서 저장함
     BPlusTree(DiskManager* dm);
 
+    void SetRootPageID(int id) { rootPageID = id; }
     // 메인 기능 함수들 (인자는 그대로지만 내부 구현이 바뀔 예정)
     string Search(int key);
     void RangeSearch(int startKey, int endKey);
