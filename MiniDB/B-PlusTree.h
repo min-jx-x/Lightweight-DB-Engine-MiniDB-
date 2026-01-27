@@ -17,8 +17,8 @@ private:
     int rootPageID;           // 루트 노드의 페이지 번호 (Node* root 대신 사용)
 
     // 내부 로직 함수들: 포인터 대신 페이지 번호(int)를 사용하도록 변경
-    void splitLeaf(int pageID);
-    void splitInternal(int pageID);
+    void splitLeaf(int pageID, TreePage& leafPage);
+    void splitInternal(int pageID, TreePage& internalPage);
     void insertIntoParent(int oldChildID, int key, int newChildID);
 
 public:
