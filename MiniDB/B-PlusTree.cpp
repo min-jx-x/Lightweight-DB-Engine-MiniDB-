@@ -284,37 +284,6 @@ void BPlusTree::PrintTree() {
 }
 
 /**
- * @brief 키에 해당하는 값 검색
- * @return 찾은 값 (실패 시 빈 문자열)
- */
-string BPlusTree::Search(int key) {
-   // 1. 예외 처리: 트리가 비어있는 경우
-   if (root == nullptr) return "";
-
-   Node* cursor = root;
-
-   // 2. 리프 노드까지 하향 탐색
-   while (cursor->isLeaf == false) {
-      int i = 0;
-      // 현재 노드의 키들과 비교하여, 찾으려는 키가 포함된 자식 노드
-      while (i < cursor->keyCount && key >= cursor->keys[i]) {
-         i++;
-      }
-      cursor = cursor->children[i];   // 해당 자식 노드로 포인터 이동
-   }
-
-   // 3. 키 존재 여부 확인 및 반환
-   for (int i = 0; i < cursor->keyCount; i++) {
-      // 키를 찾았다면 대응하는 값을 반환
-      if (cursor->keys[i] == key) {
-         return cursor->values[i];
-      }
-   }
-   // 4. 리프 노드를 다 찾아봤지만 키가 없는 경우
-   return "";
-}
-
-/**
  * @brief 범위 검색 (Start ~ End)
  * @details 리프 노드 탐색 후 연결 리스트 순회
  */
