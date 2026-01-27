@@ -110,34 +110,53 @@ string BPlusTree::Search(int key) {
     return ""; ///< 리프 노드를 다 뒤졌으나 해당 키가 없음
 }
 
-/*
-* @brief 리프 노드가 꽉 찼을 때 반으로 분할하고 부모에게 승격(Promote) 요청
-*/
-void BPlusTree::splitLeaf(Node* leaf) {
-   // 1. 새로운 형제 노드 생성
-   Node* newLeaf = new Node(true);
+/**
+ * @brief 리프 노드가 꽉 찼을 때 반으로 분할(Split)하는 함수 (디스크 버전)
+ * @param leafPageID 기존 꽉 찬 페이지 번호
+ * @param leafPage 기존 꽉 찬 페이지의 데이터 (메모리 상의 객체)
+ */
+void BPlusTree::splitLeaf(int leafPageID, TreePage& leafPage) {
+    // 1. 새 페이지 할당 및 초기화 
+    int newPageID = diskManager->AllocatePage();
+    TreePage newLeafPage;
 
-   // 2. 분할 기준점 설정 (중간 지점)
-   int splitIndex = (ORDER + 1) / 2;
+    newLeafPage.pageID = newPageID;
+    newLeafPage.isLeaf = 1;              // 리프 노드
+    newLeafPage.keyCount = 0;            // 아직 비어있음
+    newLeafPage.parentPageID = leafPage.parentPageID; // 형제니까 부모가 같음
 
-   // 3. 기존 노드의 오른쪽 절반을 새 노드로 복사
-   int j = 0;
-   for (int i = splitIndex; i < ORDER; i++) {
-      newLeaf->keys[j] = leaf->keys[i];
-      newLeaf->values[j] = leaf->values[i];
-      j++;
-   }
+    // 2. 데이터 분할 및 이동 (오른쪽 절반 -> 새 페이지)
+    int splitIndex = (ORDER + 1) / 2;
+    int j = 0;
 
-   // 4. 각 노드의 키 개수(KeyCount) 갱신
-   leaf->keyCount = splitIndex;            // 기존 노드는 절반으로 줄어듦
-   newLeaf->keyCount = ORDER - splitIndex; // 나머지는 새 노드가 가짐
+    // 중간(splitIndex)부터 끝까지의 데이터를 새 페이지로 복사
+    for (int i = splitIndex; i < ORDER; i++) {
+        // 키 복사
+        newLeafPage.keys[j] = leafPage.keys[i];
 
-   // 5. 리프 노드 연결 리스트 구조 유지
-   newLeaf->nextLeaf = leaf->nextLeaf;     // 새 노드가 기존 노드의 뒷부분을 가리킴
-   leaf->nextLeaf = newLeaf;               // 기존 노드가 새 노드를 가리킴
+        // 값 복사 (문자열이므로 strcpy 사용 필수)
+        std::strcpy(newLeafPage.values[j], leafPage.values[i]);
 
-   // 6. 부모 노드에 새 키 등록 (승진)
-   insertIntoParent(leaf, newLeaf->keys[0], newLeaf);
+        newLeafPage.keyCount++;
+        j++;
+    }
+
+    // 기존 페이지는 절반을 보냈으므로 개수를 줄임
+    leafPage.keyCount = splitIndex;
+
+    // 3. 리프 노드 연결 리스트연결
+
+    newLeafPage.nextLeafPageID = leafPage.nextLeafPageID; // 1. 새 페이지가 '원래 다음'을 가리킴
+    leafPage.nextLeafPageID = newPageID;                  // 2. 기존 페이지가 '새 페이지'를 가리킴
+
+    // 4. 변경 사항 디스크에 저장 
+    // 메모리에서 수정한 TreePage 구조체를 실제 파일에 덮어씁니다.
+    diskManager->WritePage(leafPageID, reinterpret_cast<Page&>(leafPage));
+    diskManager->WritePage(newPageID, reinterpret_cast<Page&>(newLeafPage));
+
+    // 5. 부모 노드 갱신 (Promote)
+    // 부모에게 "새 자식(newPageID)이 생겼고, 기준 키는 newLeafPage의 첫 번째 키야"라고 알림
+    insertIntoParent(leafPageID, newLeafPage.keys[0], newPageID);
 }
 
 /*
@@ -188,41 +207,62 @@ void BPlusTree::insertIntoParent(Node* left, int key, Node* right) {
    }
 }
 
-/*
-* @brief 내부 노드(Internal Node)가 꽉 찼을 때 분할하고 중간 키를 부모로 올림
-*/
-void BPlusTree::splitInternal(Node* parent) {
-   // 1. 새로운 내부 노드 생성 (Leaf 아님)
-   Node* newInternal = new Node(false);
+/**
+ * @brief 내부 노드(Internal Node)가 꽉 찼을 때 분할하는 함수
+ */
+void BPlusTree::splitInternal(int internalPageID, TreePage& internalPage) {
+    // 1. 새 페이지 할당 및 초기화
+    int newPageID = diskManager->AllocatePage();
+    TreePage newInternalPage;
 
-   // 2. 분할 기준점 설정
-   int splitIndex = (ORDER + 1) / 2;
+    newInternalPage.pageID = newPageID;
+    newInternalPage.isLeaf = 0;              // 내부 노드
+    newInternalPage.keyCount = 0;
+    newInternalPage.parentPageID = internalPage.parentPageID; // 형제니까 부모 같음
 
-   // 3. 부모로 올라갈 중간 키 백업 (내부 노드에서는 이 값이 사라짐)
-   int backupkey = parent->keys[splitIndex];
+    // 2. 분할 기준점 설정 및 중간 키 추출
+    // 내부 노드 분할의 핵심: 중간 키는 부모로 올라가고, 여기서는 사라짐
+    int splitIndex = (ORDER + 1) / 2;
+    int middleKey = internalPage.keys[splitIndex]; // 부모에게 올릴 선물
 
-   // 4. 기존 노드의 오른쪽 절반을 새 노드로 이사
-   int j = 0;
-   for (int i = splitIndex + 1; i < ORDER; i++) {
-      newInternal->keys[j] = parent->keys[i];
-      newInternal->children[j] = parent->children[i]; // 키와 왼쪽 자식 포인터를 쌍으로 이동
-      j++;
-   }
-   // 루프에서 처리되지 않은 마지막 자식 포인터 이동
-   newInternal->children[j] = parent->children[ORDER];
+    // 3. 데이터 이동 (오른쪽 절반 -> 새 페이지)
+    int j = 0;
+    // splitIndex + 1 부터 끝까지 이동 (중간 키는 건너뜀)
+    for (int i = splitIndex + 1; i < ORDER; i++) {
+        newInternalPage.keys[j] = internalPage.keys[i];
+        newInternalPage.childrenPageIDs[j] = internalPage.childrenPageIDs[i];
+        newInternalPage.keyCount++;
+        j++;
+    }
+    // 마지막 자식 포인터 하나 더 이동 (키 개수보다 포인터가 1개 더 많으므로)
+    newInternalPage.childrenPageIDs[j] = internalPage.childrenPageIDs[ORDER];
 
-   // 5. 키 개수(KeyCount) 갱신
-   parent->keyCount = splitIndex;
-   newInternal->keyCount = ORDER - splitIndex - 1;
+    // 기존 페이지 개수 줄임 (중간 키 이전까지만 남김)
+    internalPage.keyCount = splitIndex;
 
-   // 6. 이사 간 자식 노드들의 부모 포인터를 새 노드로 변경
-   for (int i = 0; i <= newInternal->keyCount; i++) {
-      Node* child = newInternal->children[i];
-      child->parent = newInternal;
-   }
+    // 4. 자식 노드들의 부모 정보 갱신
+    // 새 페이지로 이사 간 자식들은 아직 "옛날 부모(internalPageID)"를 가리키고 있음.
+    // 얘네들의 부모를 newPageID로 고쳐야함
+    for (int i = 0; i <= newInternalPage.keyCount; i++) {
+        int childPageID = newInternalPage.childrenPageIDs[i];
 
-   // 7. 부모 노드에 중간 키 등록 (재귀 호출)
-   insertIntoParent(parent, backupkey, newInternal);
+        // 자식 페이지 읽기
+        TreePage childPage;
+        diskManager->ReadPage(childPageID, reinterpret_cast<Page&>(childPage));
+
+        // 부모 변경
+        childPage.parentPageID = newPageID;
+
+        // 변경 사항 저장
+        diskManager->WritePage(childPageID, reinterpret_cast<Page&>(childPage));
+    }
+
+    // 5. 변경된 두 내부 노드 저장
+    diskManager->WritePage(internalPageID, reinterpret_cast<Page&>(internalPage));
+    diskManager->WritePage(newPageID, reinterpret_cast<Page&>(newInternalPage));
+
+    // 6. 부모 노드에 중간 키 등록 
+    insertIntoParent(internalPageID, middleKey, newPageID);
 }
 
 void BPlusTree::PrintTree() {

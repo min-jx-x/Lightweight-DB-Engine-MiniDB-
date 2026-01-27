@@ -1,11 +1,9 @@
 #pragma once
+#include "Common.h" 
 #include <iostream>
 #include <fstream>
 #include <string>
 #include <cstring>
-
-// 페이지 크기는 보통 OS 페이지 크기와 맞춘 4KB (4096 bytes)를 사용
-const int PAGE_SIZE = 4096;
 
 /**
  * @brief 페이지 구조체
