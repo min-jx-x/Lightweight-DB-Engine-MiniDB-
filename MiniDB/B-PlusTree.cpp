@@ -1,3 +1,4 @@
+#define _CRT_SECURE_NO_WARNINGS
 #pragma once
 #include "B-PlusTree.h"
 #include <iostream>
@@ -187,6 +188,64 @@ void BPlusTree::splitLeaf(int leafPageID, TreePage& leafPage) {
     // 5. 부모 노드 갱신 (Promote)
     // 부모에게 "새 자식(newPageID)이 생겼고, 기준 키는 newLeafPage의 첫 번째 키야"라고 알림
     insertIntoParent(leafPageID, newLeafPage.keys[0], newPageID);
+}
+
+/**
+ * @brief 내부 노드(Internal Node)가 꽉 찼을 때 분할하는 함수
+ */
+void BPlusTree::splitInternal(int internalPageID, TreePage& internalPage) {
+    // 1. 새 페이지 할당 및 초기화
+    int newPageID = diskManager->AllocatePage();
+    TreePage newInternalPage;
+
+    newInternalPage.pageID = newPageID;
+    newInternalPage.isLeaf = 0;              // 내부 노드
+    newInternalPage.keyCount = 0;
+    newInternalPage.parentPageID = internalPage.parentPageID; // 형제니까 부모 같음
+
+    // 2. 분할 기준점 설정 및 중간 키 추출
+    // 내부 노드 분할의 핵심: 중간 키는 부모로 올라가고, 여기서는 사라짐
+    int splitIndex = (ORDER + 1) / 2;
+    int middleKey = internalPage.keys[splitIndex]; // 부모에게 올릴 선물
+
+    // 3. 데이터 이동 (오른쪽 절반 -> 새 페이지)
+    int j = 0;
+    // splitIndex + 1 부터 끝까지 이동 (중간 키는 건너뜀)
+    for (int i = splitIndex + 1; i < ORDER; i++) {
+        newInternalPage.keys[j] = internalPage.keys[i];
+        newInternalPage.childrenPageIDs[j] = internalPage.childrenPageIDs[i];
+        newInternalPage.keyCount++;
+        j++;
+    }
+    // 마지막 자식 포인터 하나 더 이동 (키 개수보다 포인터가 1개 더 많으므로)
+    newInternalPage.childrenPageIDs[j] = internalPage.childrenPageIDs[ORDER];
+
+    // 기존 페이지 개수 줄임 (중간 키 이전까지만 남김)
+    internalPage.keyCount = splitIndex;
+
+    // 4. 자식 노드들의 부모 정보 갱신
+    // 새 페이지로 이사 간 자식들은 아직 "옛날 부모(internalPageID)"를 가리키고 있음.
+    // 얘네들의 부모를 newPageID로 고쳐야함
+    for (int i = 0; i <= newInternalPage.keyCount; i++) {
+        int childPageID = newInternalPage.childrenPageIDs[i];
+
+        // 자식 페이지 읽기
+        TreePage childPage;
+        diskManager->ReadPage(childPageID, reinterpret_cast<Page&>(childPage));
+
+        // 부모 변경
+        childPage.parentPageID = newPageID;
+
+        // 변경 사항 저장
+        diskManager->WritePage(childPageID, reinterpret_cast<Page&>(childPage));
+    }
+
+    // 5. 변경된 두 내부 노드 저장
+    diskManager->WritePage(internalPageID, reinterpret_cast<Page&>(internalPage));
+    diskManager->WritePage(newPageID, reinterpret_cast<Page&>(newInternalPage));
+
+    // 6. 부모 노드에 중간 키 등록 
+    insertIntoParent(internalPageID, middleKey, newPageID);
 }
 
 /**
