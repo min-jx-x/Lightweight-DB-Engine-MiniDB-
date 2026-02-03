@@ -279,102 +279,120 @@ void BPlusTree::insertIntoParent(int oldChildID, int key, int newChildID) {
     diskManager->WritePage(newChildID, newPage);
 }
 
+/**
+*@brief 디스크에 저장된 B + Tree 구조를 BFS로 시각화하여 출력
+* @details
+* 1. 큐(Queue)에 루트 페이지 번호를 넣고 탐색을 시작합니다.
+* 2. DiskManager를 통해 페이지를 메모리로 읽어옵니다
+* 3. 현재 레벨의 모든 노드를 출력하고, 자식 노드들의 PageID를 큐에 추가합니다.
+*/
 void BPlusTree::PrintTree() {
-   // 트리가 비어있는지 확인
-   if (root == nullptr) {
-      std::cout << "Tree is empty." << std::endl;
-      return;
-   }
+    // 예외 처리(트리가 비어있는 경우)
+    if (rootPageID == -1) {
+        std::cout << "Tree is empty." << std::endl;
+        return;
+    }
 
-   // BFS를 위한 큐 선언 (std::queue 사용)
-   std::queue<Node*> q;
-   q.push(root);
+    // BFS 탐색을 위한 큐 선언 (저장 데이터: 페이지 번호)
+    std::queue<int> q;
+    q.push(rootPageID);
 
-   int level = 0;
-   std::cout << "=== B+ Tree Structure (BFS) ===" << std::endl;
+    int level = 0;
+    std::cout << "\n=== B+ Tree Structure ===" << std::endl;
 
-   while (!q.empty()) {
-      int levelSize = q.size(); // 현재 레벨에 있는 노드의 개수
+    while (!q.empty()) {
+        int levelSize = q.size(); // 현재 레벨에 존재하는 노드의 개수
 
-      std::cout << "Level " << level << ": ";
+        std::cout << "Level " << level << ": ";
 
-      // 현재 레벨의 모든 노드를 순회
-      for (int i = 0; i < levelSize; i++) {
-         Node* curr = q.front();
-         q.pop();
+        // 현재 레벨의 모든 노드를 순회
+        for (int i = 0; i < levelSize; i++) {
+            int currentPageID = q.front();
+            q.pop();
 
-         std::cout << "[ ";
-         for (int j = 0; j < curr->keyCount; j++) {
-            // 1. 키(Key) 출력
-            std::cout << curr->keys[j];
+            // Disk I/O 페이지 데이터 읽기
+            Page page;
+            diskManager->ReadPage(currentPageID, page);
+            TreePage* curr = reinterpret_cast<TreePage*>(page.data);
 
-            // 2. 리프 노드라면 데이터(Value)도 함께 출력
-            if (curr->isLeaf) {
-               std::cout << "(" << curr->values[j] << ")";
+            // 노드 정보 출력
+            std::cout << "[ ID=" << curr->pageID << " : ";
+            for (int j = 0; j < curr->keyCount; j++) {
+                std::cout << curr->keys[j];
+
+                if (j < curr->keyCount - 1) std::cout << " ";
             }
+            std::cout << " ] ";
 
-            // 마지막 키가 아니라면 공백 추가
-            if (j < curr->keyCount - 1) {
-               std::cout << " ";
+            // 내부 노드(Internal Node)라면 자식 페이지 번호를 큐에 추가
+            if (curr->isLeaf == 0) {
+                // 자식 포인터 개수는 항상 키 개수 + 1
+                for (int j = 0; j <= curr->keyCount; j++) {
+                    if (curr->childrenPageIDs[j] != -1) {
+                        q.push(curr->childrenPageIDs[j]);
+                    }
+                }
             }
-         }
-         std::cout << " ] ";
-
-         // 내부 노드라면 자식들을 큐에 추가
-         if (!curr->isLeaf) {
-            // 자식 포인터 개수는 키 개수 + 1
-            for (int j = 0; j <= curr->keyCount; j++) {
-               if (curr->children[j] != nullptr) {
-                  q.push(curr->children[j]);
-               }
-            }
-         }
-      }
-      // 레벨 변경 시 줄바꿈
-      std::cout << std::endl;
-      level++;
-   }
-   std::cout << "===============================" << std::endl;
+        }
+        std::cout << std::endl; // 레벨 변경 시 줄바꿈
+        level++;
+    }
+    std::cout << "============================================" << std::endl;
 }
 
 /**
- * @brief 범위 검색 (Start ~ End)
- * @details 리프 노드 탐색 후 연결 리스트 순회
+ * @brief 범위 검색: StartKey ~ EndKey 사이의 데이터 검색
+ * @details
+ * 1. Index Layer: StartKey가 위치할 리프 노드까지 탐색하여 내려갑니다.
+ * 2. Data Layer: 리프 노드의 연결 리스트(nextLeafPageID)를 타고 이동하며 범위 내 데이터를 수집합니다.
  */
 void BPlusTree::RangeSearch(int startKey, int endKey) {
-   // 1. 예외 처리: 트리가 비어있는 경우
-   if (root == nullptr) return;
+    if (rootPageID == -1) return;
 
-   Node* cursor = root;
+    int cursorPageID = rootPageID;
+    Page page;
 
-   // 2. 시작점 탐색
-   while (cursor->isLeaf == false) {
-      int i = 0;
-      // startKey가 들어갈 수 있는 위치를 탐색
-      while (i < cursor->keyCount && startKey >= cursor->keys[i]) {
-         i++;
-      }
-      cursor = cursor->children[i];
-   }
+    // 1. 시작점이 포함된 리프 노드 탐색
+    while (true) {
+        diskManager->ReadPage(cursorPageID, page);
+        TreePage* cursor = reinterpret_cast<TreePage*>(page.data);
 
-   cout << "Range result: ";
-   bool finish = false;   // 탐색 종료 플래그
+        // 리프 노드 도착 시 중단
+        if (cursor->isLeaf) break;
 
-   // 3. 리프 노드 연결 리스트를 따라 횡단 탐색
-   while (cursor != nullptr && finish == false) {
-      for (int i = 0; i < cursor->keyCount; i++) {      // 현재 노드 내의 모든 키를 순회
-         // 조건 1: 키가 범위 내에 포함되는 경우 -> 출력
-         if (cursor->keys[i] >= startKey && cursor->keys[i] <= endKey) {
-            cout << "(" << cursor->keys[i] << ":" << cursor->values[i] << ") ";
-         }
-         // 조건 2: 키가 종료 키(endKey)를 넘어선 경우 -> 종료
-         else if (cursor->keys[i] > endKey) {
-            finish = true;
-            break;
-         }
-      }
-      // 현재 노드 탐색이 끝나면 다음 형제 노드(Sibling)로 이동
-      cursor = cursor->nextLeaf;
-   }
-   cout << endl;
+        // 어느 자식으로 내려갈지 결정
+        int i = 0;
+        while (i < cursor->keyCount && startKey >= cursor->keys[i]) {
+            i++;
+        }
+        cursorPageID = cursor->childrenPageIDs[i];
+    }
+
+    std::cout << "Range Result [" << startKey << " ~ " << endKey << "]: ";
+
+    // 2. 리프 노드 연결 리스트 순회
+    bool finish = false;
+
+    // 다음 페이지가 없을 때(-1)까지 혹은 종료 조건(finish)을 만날 때까지 반복
+    while (cursorPageID != -1 && !finish) {
+        // 현재 페이지 읽기 (위 루프에서 읽었더라도 갱신 필요)
+        diskManager->ReadPage(cursorPageID, page);
+        TreePage* cursor = reinterpret_cast<TreePage*>(page.data);
+
+        // 현재 노드 내의 키들을 확인
+        for (int i = 0; i < cursor->keyCount; i++) {
+            // 조건1: 범위 내에 있는 경우 -> 출력
+            if (cursor->keys[i] >= startKey && cursor->keys[i] <= endKey) {
+                std::cout << "(" << cursor->keys[i] << ":" << cursor->values[i] << ") ";
+            }
+            // 조건2: 키가 종료 범위를 넘어선 경우 -> 탐색 종료
+            else if (cursor->keys[i] > endKey) {
+                finish = true;
+                break;
+            }
+        }
+        // 다음 형제 리프 페이지로 점프 (연결 리스트)
+        cursorPageID = cursor->nextLeafPageID;
+    }
+    std::cout << std::endl;
 }
