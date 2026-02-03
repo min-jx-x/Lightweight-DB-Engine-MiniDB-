@@ -9,6 +9,7 @@
  * @param dbFileName 열거나 생성할 데이터베이스 파일의 이름
  */
 DiskManager::DiskManager(const std::string& dbFileName) : fileName(dbFileName) {
+    nextPageId = 0;
     // 1. 읽기/쓰기/바이너리 모드로 파일 열기 시도
     // std::ios::in (읽기), std::ios::out (쓰기), std::ios::binary (바이너리 모드)
     dbFile.open(fileName, std::ios::in | std::ios::out | std::ios::binary);
