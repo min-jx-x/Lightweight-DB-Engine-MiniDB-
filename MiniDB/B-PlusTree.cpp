@@ -190,6 +190,61 @@ void BPlusTree::splitLeaf(int leafPageID, TreePage& leafPage) {
 }
 
 /**
+ * @brief 내부 노드가 가득 찼을 때 분할하는 함수
+ * @details
+ * 1. 새 페이지를 할당하고 내부 노드로 설정합니다.
+ * 2. 중간 키를 기준으로 키와 자식 포인터를 분할합니다.
+ * 3. 새 노드로 옮겨진 자식들의 부모 포인터(parentPageID)를 갱신합니다.
+ * 4. 중간 키를 부모 노드로 올립니다.
+ */
+void BPlusTree::splitInternal(int pageID, TreePage& internalPage) {
+    // 1. 새 페이지 할당 및 초기화
+    int newPageID = diskManager->AllocatePage();
+    TreePage newInternalPage;
+
+    newInternalPage.pageID = newPageID;
+    newInternalPage.isLeaf = 0;                      // 내부 노드
+    newInternalPage.parentPageID = internalPage.parentPageID;
+
+    // 2. 분할 지점 계산 (ORDER=3인 경우, index 1의 키가 위로 올라감)
+    int splitIndex = ORDER / 2;
+    int midKey = internalPage.keys[splitIndex];
+
+    // 3. 데이터 이동 (중간 키 이후의 데이터들을 새 노드로 복사)
+    int j = 0;
+    for (int i = splitIndex + 1; i < ORDER; i++) {
+        newInternalPage.keys[j] = internalPage.keys[i];
+        newInternalPage.childrenPageIDs[j] = internalPage.childrenPageIDs[i];
+        newInternalPage.keyCount++;
+        j++;
+    }
+    // 마지막 자식 포인터까지 이동
+    newInternalPage.childrenPageIDs[j] = internalPage.childrenPageIDs[ORDER];
+
+    // 4. 기존 노드 크기 조정 (중간 키는 부모로 올라가므로 제외)
+    internalPage.keyCount = splitIndex;
+
+    // 5. 자식 노드들의 부모 포인터 갱신
+    for (int i = 0; i <= newInternalPage.keyCount; i++) {
+        int childID = newInternalPage.childrenPageIDs[i];
+        if (childID != -1) {
+            Page childPage;
+            diskManager->ReadPage(childID, childPage);
+            TreePage* child = reinterpret_cast<TreePage*>(childPage.data);
+            child->parentPageID = newPageID;
+            diskManager->WritePage(childID, childPage);
+        }
+    }
+
+    // 6. 변경 사항 디스크 저장
+    diskManager->WritePage(pageID, reinterpret_cast<Page&>(internalPage));
+    diskManager->WritePage(newPageID, reinterpret_cast<Page&>(newInternalPage));
+
+    // 7. 부모 노드로 중간 키 올리기
+    insertIntoParent(internalPage.parentPageID, midKey, newPageID);
+}
+
+/**
  * @brief 자식 노드가 분할(Split)된 후, 부모 노드에 키와 포인터를 갱신하는 함수
  * @details 분할된 두 자식을 연결하기 위해 다음 두 가지 경우를 처리합니다:
  * 1. 루트 분할(Root Split): 부모가 없는 경우, 새로운 루트 노드를 생성하여 트리 높이를 높입니다.
