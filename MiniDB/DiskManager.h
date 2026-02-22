@@ -42,6 +42,9 @@ public:
     // 새로운 페이지를 할당하고 그 페이지 ID를 반환 (파일 크기가 늘어남)
     int AllocatePage();
 
+    // 현재 nextPageId를 반환하는 함수
+    int GetNextPageID() { return nextPageId; }
+
     // 현재 파일에 총 몇 개의 페이지가 있는지 확인
     int GetNumPages();
 };

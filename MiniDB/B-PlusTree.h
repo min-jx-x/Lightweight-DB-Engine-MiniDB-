@@ -21,6 +21,7 @@ private:
     void splitInternal(int pageID, TreePage& internalPage);
     void insertIntoParent(int oldChildID, int key, int newChildID);
 
+    void UpdateMetaPage(); // 메타 페이지 업데이트 함수
 public:
     // 생성자: DiskManager 포인터를 받아서 저장함
     BPlusTree(DiskManager* dm);
