@@ -22,6 +22,12 @@ private:
     void insertIntoParent(int oldChildID, int key, int newChildID);
 
     void UpdateMetaPage(); // 메타 페이지 업데이트 함수
+
+    void deleteEntry(int pageID, int key); // 실제 노드에서 삭제를 수행하는 함수
+    void redistribute(int pageID, int neighborID, int parentID, int keyIndex, bool isLeft); // 키 재배치
+    void mergeNodes(int pageID, int neighborID, int parentID, int keyIndex); // 노드 병합
+    void adjustRoot(); // 루트 노드 비었을 때 조정
+    
 public:
     // 생성자: DiskManager 포인터를 받아서 저장함
     BPlusTree(DiskManager* dm);
@@ -32,4 +38,6 @@ public:
     void RangeSearch(int startKey, int endKey);
     void Insert(int key, string value);
     void PrintTree();
+
+    void Remove(int key);
 };

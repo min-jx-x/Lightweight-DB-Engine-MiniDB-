@@ -466,3 +466,248 @@ void BPlusTree::RangeSearch(int startKey, int endKey) {
     }
     std::cout << std::endl;
 }
+
+/**
+ * @brief B+ 트리에서 특정 키와 해당 데이터를 삭제하는 공개 인터페이스
+ * @param key 삭제하고자 하는 데이터의 키값
+ */
+void BPlusTree::Remove(int key) {
+    if (rootPageID == -1) return;
+
+    // 재귀적인 삭제 로직 시작 (루트 페이지부터 탐색하여 삭제 및 균형 조정 수행)
+    deleteEntry(rootPageID, key);
+    // 삭제로 인해 루트 노드가 비었을 가능성을 체크하여 트리의 높이를 조정
+    adjustRoot();
+    // 모든 삭제 및 구조 조정이 완료된 후, 변경된 rootPageID 등을 메타 페이지(0번)에 기록
+    // 이를 통해 프로그램 재시작 시에도 삭제된 트리 상태가 그대로 유지됨
+    UpdateMetaPage();
+}
+
+/**
+ * @brief 노드 내에서 키를 찾아 삭제하고, 필요 시 재배치나 병합을 호출하는 재귀 함수
+ * @param pageID 현재 작업을 수행 중인 페이지 ID
+ * @param key 삭제할 키
+ */
+void BPlusTree::deleteEntry(int pageID, int key) {
+    Page p;
+    diskManager->ReadPage(pageID, p); // 현재 페이지 읽기
+    TreePage* node = reinterpret_cast<TreePage*>(p.data);
+
+    // 1단계: 실제 데이터가 담긴 리프 노드에서 키 삭제 
+    if (node->isLeaf) {
+        int i = 0;
+        // 삭제할 키의 위치 찾기
+        while (i < node->keyCount && node->keys[i] < key) i++;
+
+        // 키가 존재하지 않으면 함수 종료
+        if (i == node->keyCount || node->keys[i] != key) return;
+
+        // 키와 값을 한 칸씩 당겨서 삭제 처리 (Shift)
+        for (int j = i; j < node->keyCount - 1; j++) {
+            node->keys[j] = node->keys[j + 1];
+            strncpy(node->values[j], node->values[j + 1], 128);
+        }
+        node->keyCount--; // 키 개수 감소
+        diskManager->WritePage(pageID, p); // 변경 사항 저장
+    }
+    // 2단계: 내부 노드인 경우 리프 노드를 향해 재귀 호출
+    else {
+        int i = 0;
+        // 키 범위를 비교하여 어느 자식으로 내려갈지 결정
+        while (i < node->keyCount && key >= node->keys[i]) i++;
+
+        deleteEntry(node->childrenPageIDs[i], key);
+
+        // 중요: 하위 노드에서 병합 등이 일어나 부모(현재 노드)가 바뀌었을 수 있으므로 다시 읽음
+        diskManager->ReadPage(pageID, p);
+    }
+
+    // 3단계: Underflow(키 부족) 체크 및 처리
+    // 루트가 아니고, 키 개수가 최소 기준(ORDER=3 기준 1개) 미만일 때 수행
+    if (pageID != rootPageID && node->keyCount < 1) {
+        Page pp;
+        diskManager->ReadPage(node->parentPageID, pp); // 부모 노드 읽기
+        TreePage* parent = reinterpret_cast<TreePage*>(pp.data);
+
+        // 부모 내에서 현재 노드가 몇 번째 자식인지 인덱스 확인
+        int idx = 0;
+        while (idx <= parent->keyCount && parent->childrenPageIDs[idx] != pageID) idx++;
+
+        // 3-A: 왼쪽 형제가 있는 경우 (idx > 0)
+        if (idx > 0) {
+            int leftID = parent->childrenPageIDs[idx - 1];
+            Page lp; diskManager->ReadPage(leftID, lp);
+            TreePage* leftNode = reinterpret_cast<TreePage*>(lp.data);
+
+            // 왼쪽 형제가 키를 빌려줄 여유가 있다면 재배치
+            if (leftNode->keyCount > 1)
+                redistribute(pageID, leftID, node->parentPageID, idx - 1, true);
+            // 여유가 없다면 왼쪽 형제와 병합
+            else
+                mergeNodes(leftID, pageID, node->parentPageID, idx - 1);
+        }
+        // 3-B: 왼쪽 형제가 없는 경우 (즉, 내가 첫 번째 자식인 경우) 오른쪽 형제 확인
+        else {
+            int rightID = parent->childrenPageIDs[idx + 1];
+            Page rp; diskManager->ReadPage(rightID, rp);
+            TreePage* rightNode = reinterpret_cast<TreePage*>(rp.data);
+
+            // 오른쪽 형제가 키를 빌려줄 여유가 있다면 재배치
+            if (rightNode->keyCount > 1)
+                redistribute(pageID, rightID, node->parentPageID, idx, false);
+            // 여유가 없다면 오른쪽 형제와 병합
+            else
+                mergeNodes(pageID, rightID, node->parentPageID, idx);
+        }
+    }
+}
+
+/**
+* @brief 키 개수가 부족한 노드가 인접한 형제 노드로부터 키를 하나 빌려오는 함수
+* @param pageID 키가 부족한 현재 페이지 ID
+* @param neighborID 키를 빌려줄 형제 페이지 ID
+* @param parentID 부모 페이지 ID (경계 키 수정을 위해 필요)
+* @param keyIndex 부모 노드 내에서 두 자식을 가르는 키의 인덱스
+* @param isLeft 형제가 왼쪽이면 true, 오른쪽이면 false
+*/
+void BPlusTree::redistribute(int pageID, int neighborID, int parentID, int keyIndex, bool isLeft) {
+    Page p, np, pp;
+    // 현재 노드, 형제 노드, 부모 노드를 모두 디스크에서 읽어옴
+    diskManager->ReadPage(pageID, p);
+    diskManager->ReadPage(neighborID, np);
+    diskManager->ReadPage(parentID, pp);
+
+    TreePage* node = (TreePage*)p.data;
+    TreePage* neighbor = (TreePage*)np.data;
+    TreePage* parent = (TreePage*)pp.data;
+
+    // 리프 노드에서의 재배치 처리
+    if (node->isLeaf) {
+        if (isLeft) { // CASE 1: 왼쪽 형제에게서 가장 큰(마지막) 키를 빌려옴
+            // 1. 현재 노드의 기존 키들을 뒤로 한 칸씩 밀어서 0번 자리를 비움
+            for (int i = node->keyCount; i > 0; i--) {
+                node->keys[i] = node->keys[i - 1];
+                strncpy(node->values[i], node->values[i - 1], 128);
+            }
+            // 2. 왼쪽 형제의 마지막 키와 데이터를 내 0번 자리에 복사
+            node->keys[0] = neighbor->keys[neighbor->keyCount - 1];
+            strncpy(node->values[0], neighbor->values[neighbor->keyCount - 1], 128);
+
+            // 3. 개수 조정 및 부모의 경계 키를 내 0번 키와 동일하게 업데이트
+            neighbor->keyCount--;
+            node->keyCount++;
+            parent->keys[keyIndex] = node->keys[0];
+        }
+        else { // CASE 2: 오른쪽 형제에게서 가장 작은(첫 번째) 키를 빌려옴
+            // 1. 오른쪽 형제의 0번 키와 데이터를 내 마지막 자리에 추가
+            node->keys[node->keyCount] = neighbor->keys[0];
+            strncpy(node->values[node->keyCount], neighbor->values[0], 128);
+
+            // 2. 오른쪽 형제의 남은 키들을 앞으로 한 칸씩 당겨서 0번 자리를 채움
+            for (int i = 0; i < neighbor->keyCount - 1; i++) {
+                neighbor->keys[i] = neighbor->keys[i + 1];
+                strncpy(neighbor->values[i], neighbor->values[i + 1], 128);
+            }
+
+            // 3. 개수 조정 및 부모의 경계 키를 오른쪽 형제의 새로운 0번 키로 업데이트
+            neighbor->keyCount--;
+            node->keyCount++;
+            parent->keys[keyIndex] = neighbor->keys[0];
+        }
+    }
+    // 수정된 3개 페이지를 모두 디스크에 다시 기록
+    diskManager->WritePage(pageID, p);
+    diskManager->WritePage(neighborID, np);
+    diskManager->WritePage(parentID, pp);
+}
+
+/**
+ * @brief 키가 부족한 노드를 형제 노드와 하나로 합치는 함수 (Underflow 처리)
+ * @param pageID 삭제가 발생한 페이지 ID
+ * @param neighborID 합쳐질 형제 페이지 ID
+ * @param parentID 부모 페이지 ID (사이 키 삭제를 위해 필요)
+ * @param keyIndex 부모 노드 내에서 삭제될 경계 키의 인덱스
+ */
+void BPlusTree::mergeNodes(int leftID, int rightID, int parentID, int keyIndex) {
+    Page lp, rp, pp;
+    diskManager->ReadPage(leftID, lp);
+    diskManager->ReadPage(rightID, rp);
+    diskManager->ReadPage(parentID, pp);
+
+    TreePage* left = (TreePage*)lp.data, * right = (TreePage*)rp.data, * parent = (TreePage*)pp.data;
+
+    // CASE 1: 리프 노드 병합
+    if (left->isLeaf) {
+        for (int i = 0; i < right->keyCount; i++) {
+            left->keys[left->keyCount] = right->keys[i];
+            strncpy(left->values[left->keyCount], right->values[i], 128);
+            left->keyCount++;
+        }
+        left->nextLeafPageID = right->nextLeafPageID; // 연결 리스트 재연결
+    }
+    // CASE 2: 내부 노드 병합 
+    else {
+        //  1. 부모의 분할 키를 왼쪽 노드로 내려줌
+        left->keys[left->keyCount] = parent->keys[keyIndex];
+        left->keyCount++;
+
+        // 2. 오른쪽 노드의 키와 자식 포인터들을 왼쪽으로 이동
+        for (int i = 0; i < right->keyCount; i++) {
+            left->keys[left->keyCount] = right->keys[i];
+            left->childrenPageIDs[left->keyCount] = right->childrenPageIDs[i];
+
+            // 이동하는 자식들의 부모 정보를 leftID로 갱신해야 함
+            Page cp;
+            diskManager->ReadPage(right->childrenPageIDs[i], cp);
+            ((TreePage*)cp.data)->parentPageID = leftID;
+            diskManager->WritePage(right->childrenPageIDs[i], cp);
+
+            left->keyCount++;
+        }
+        // 마지막 자식 포인터 이동 및 부모 갱신
+        left->childrenPageIDs[left->keyCount] = right->childrenPageIDs[right->keyCount];
+        Page cp_last;
+        diskManager->ReadPage(right->childrenPageIDs[right->keyCount], cp_last);
+        ((TreePage*)cp_last.data)->parentPageID = leftID;
+        diskManager->WritePage(right->childrenPageIDs[right->keyCount], cp_last);
+    }
+
+    // 3. 부모 노드에서 사용된 키와 오른쪽 자식 포인터 삭제
+    for (int i = keyIndex; i < parent->keyCount - 1; i++) {
+        parent->keys[i] = parent->keys[i + 1];
+        parent->childrenPageIDs[i + 1] = parent->childrenPageIDs[i + 2];
+    }
+    parent->keyCount--;
+
+    // 4. 변경된 페이지들 저장
+    diskManager->WritePage(leftID, lp);
+    diskManager->WritePage(parentID, pp);
+    // rightID 페이지는 이제 빈 페이지가 되지만, 간단한 구현을 위해 여기서는 해제 로직 생략
+}
+
+/**
+ * @brief 삭제 후 루트 노드가 비었을 경우, 트리의 높이를 줄이고 새로운 루트를 설정하는 함수
+ */
+void BPlusTree::adjustRoot() {
+    Page p;
+    // 현재 루트 페이지의 데이터를 디스크에서 읽어옴
+    diskManager->ReadPage(rootPageID, p);
+    TreePage* root = reinterpret_cast<TreePage*>(p.data);
+
+    if (root->keyCount == 0 && !root->isLeaf) {
+
+        // 1. 유일하게 남은 자식 노드(0번 인덱스)를 새로운 루트로 승격
+        rootPageID = root->childrenPageIDs[0];
+
+        // 2. 새로운 루트가 된 자식 노드의 페이지 정보를 읽어옴
+        Page np;
+        diskManager->ReadPage(rootPageID, np);
+        TreePage* newRoot = reinterpret_cast<TreePage*>(np.data);
+
+        // 3. 새로운 루트는 부모가 없으므로 parentPageID를 -1(NULL)로 설정
+        newRoot->parentPageID = -1;
+
+        // 4. 변경된 새로운 루트의 정보를 디스크에 다시 기록
+        diskManager->WritePage(rootPageID, np);
+    }
+}
