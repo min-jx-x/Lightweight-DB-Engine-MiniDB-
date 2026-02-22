@@ -8,9 +8,23 @@
 /**
  * @brief 생성자: DiskManager를 연결하고 초기화
  */
+ // 생성자: 0번 페이지에서 rootPageID를 읽어옴
 BPlusTree::BPlusTree(DiskManager* dm) : diskManager(dm) {
-    // 일단 새 트리라고 가정하고 루트 페이지가 없다고(-1) 설정
-    rootPageID = -1;
+    Page p;
+    diskManager->ReadPage(0, p);
+    MetaPage* meta = reinterpret_cast<MetaPage*>(p.data);
+    this->rootPageID = meta->rootPageID;
+}
+
+// 메타 페이지 갱신 구현
+void BPlusTree::UpdateMetaPage() {
+    Page p;
+    MetaPage meta;
+    meta.rootPageID = this->rootPageID;
+    meta.nextPageID = diskManager->GetNextPageID(); // DiskManager에 이 함수가 있어야 함
+
+    std::memcpy(p.data, &meta, sizeof(MetaPage));
+    diskManager->WritePage(0, p);
 }
 
 /**
@@ -39,28 +53,25 @@ void BPlusTree::Insert(int key, string value) {
 
         root->keys[0] = key;
         strncpy(root->values[0], value.c_str(), 127);
-        root->values[0][127] = '\0'; // NULL 종료 문자 보장
+        root->values[0][127] = '\0';
 
         diskManager->WritePage(rootPageID, page);
+
+        UpdateMetaPage(); // [확인] 첫 루트 생성 시 저장 (잘 들어가 있음)
         return;
     }
 
     // 2. 탐색(Traversal): 데이터가 들어갈 리프 노드 찾기
     int currentPageID = rootPageID;
-
     diskManager->ReadPage(currentPageID, page);
     TreePage* node = reinterpret_cast<TreePage*>(page.data);
 
-    // 리프 노드에 도달할 때까지 자식으로 이동
     while (node->isLeaf == 0) {
         int i = 0;
-        // 현재 키보다 큰 첫 번째 키를 찾습니다 (오른쪽 자식 탐색)
         while (i < node->keyCount && node->keys[i] <= key) {
             i++;
         }
-
         int nextPageID = node->childrenPageIDs[i];
-
         currentPageID = nextPageID;
         diskManager->ReadPage(currentPageID, page);
         node = reinterpret_cast<TreePage*>(page.data);
@@ -68,16 +79,16 @@ void BPlusTree::Insert(int key, string value) {
 
     // 3. 노드가 가득 찬 경우: 분할(Split) 후 재시도
     if (node->keyCount == ORDER) {
-        // 현재 리프 노드를 분할합니다. (인자로 *node 참조 전달)
         splitLeaf(currentPageID, *node);
 
-        // 트리 구조가 변경되었으므로, 루트부터 다시 탐색하여 삽입을 시도합니다. (재귀 호출)
+        // [추가] 분할 과정에서 루트가 바뀌었을 수 있으므로 업데이트
+        UpdateMetaPage();
+
         Insert(key, value);
         return;
     }
 
     // 4. 데이터 삽입: 리프 노드 내 정렬된 위치에 삽입
-    // 새로운 키가 들어갈 공간을 만들기 위해 기존 요소들을 뒤로 이동(Shift)
     int i = node->keyCount - 1;
     while (i >= 0 && node->keys[i] > key) {
         node->keys[i + 1] = node->keys[i];
@@ -85,17 +96,17 @@ void BPlusTree::Insert(int key, string value) {
         i--;
     }
 
-    // 키와 값 삽입
     node->keys[i + 1] = key;
     strncpy(node->values[i + 1], value.c_str(), 127);
     node->values[i + 1][127] = '\0';
-
     node->keyCount++;
 
     // 5. 저장(Persist): 변경 사항을 디스크에 기록
     diskManager->WritePage(currentPageID, page);
-}
 
+    //  삽입으로 인해 nextPageID 등이 변경되었을 수 있으므로 메타 페이지 갱신
+    UpdateMetaPage();
+}
 
 /*
 * @brief Disk-version:B+ Tree에서 특정 Key에 해당하는 value 검색

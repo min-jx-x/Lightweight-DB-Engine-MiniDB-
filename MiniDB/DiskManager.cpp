@@ -125,3 +125,23 @@ int DiskManager::GetNumPages() {
     // 전체 바이트 크기 / 페이지 크기(4KB) = 페이지 개수
     return (int)(fileSize / PAGE_SIZE);
 }
+
+DiskManager::DiskManager(const std::string& dbFileName) : fileName(dbFileName) {
+    dbFile.open(fileName, std::ios::in | std::ios::out | std::ios::binary);
+
+    if (!dbFile.is_open()) {
+        dbFile.open(fileName, std::ios::out | std::ios::binary);
+        dbFile.close();
+        dbFile.open(fileName, std::ios::in | std::ios::out | std::ios::binary);
+
+        Page p;
+        MetaPage meta;
+        std::memcpy(p.data, &meta, sizeof(MetaPage));
+        WritePage(0, p);
+        nextPageId = 1; // 다음 데이터는 1번 페이지부터
+    }
+    else {
+        // 기존 파일이 있다면 파일 크기를 보고 nextPageId 복구
+        nextPageId = GetNumPages();
+    }
+}

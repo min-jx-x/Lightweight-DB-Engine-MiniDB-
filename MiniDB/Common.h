@@ -5,6 +5,14 @@
 const int PAGE_SIZE = 4096; ///< 디스크 페이지 크기 (4KB 고정)
 const int ORDER = 3;        ///< B+ Tree 차수 (한 노드에 최대 3개 키 저장 가능)
 
+struct MetaPage {
+    int rootPageID;    // 루트 노드의 위치
+    int nextPageID;    // 다음에 할당할 페이지 번호
+    char padding[PAGE_SIZE - sizeof(int) * 2];
+
+    MetaPage() : rootPageID(-1), nextPageID(1) {}
+};
+
 /**
  * @struct TreePage
  * @brief 디스크에 저장되는 B+ Tree 노드 구조체 (Node* 포인터 제거 버전)
